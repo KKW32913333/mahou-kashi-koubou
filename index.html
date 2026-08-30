@@ -223,6 +223,66 @@
   .level-btn.boss{ background: linear-gradient(180deg, #FFD98A, #E8813A); }
   .level-btn.super{ background: linear-gradient(180deg, #C6AEEA, var(--grape-deep)); }
 
+  /* ---------------- BADGES ---------------- */
+  .icon-btn.badge-slot{ font-size:17px; }
+  .icon-btn.badge-slot.filled{
+    background: linear-gradient(180deg, #fff, #FBF3FF);
+    border-color: transparent;
+    box-shadow: 0 0 0 2px #E6C6EE, 0 3px 0 rgba(0,0,0,.08);
+  }
+  .icon-btn.badge-slot.tier-bronze{ box-shadow: 0 0 0 2px #D9A066, 0 3px 0 rgba(0,0,0,.08); }
+  .icon-btn.badge-slot.tier-silver{ box-shadow: 0 0 0 2px #B9C2D0, 0 3px 0 rgba(0,0,0,.08); }
+  .icon-btn.badge-slot.tier-gold{ box-shadow: 0 0 0 2px #F2C94C, 0 3px 0 rgba(0,0,0,.08); }
+  .icon-btn.badge-slot.tier-rainbow{
+    box-shadow: 0 0 0 2px transparent, 0 3px 0 rgba(0,0,0,.08);
+    background-image: linear-gradient(#fff,#fff), linear-gradient(120deg,#FF6B8B,#FFD36B,#7BE0A8,#6BC5FF,#C58BFF);
+    background-origin: border-box; background-clip: padding-box, border-box;
+    border: 2px solid transparent;
+  }
+
+  .badge-hint{ text-align:center; font-size:11px; color:#8A6B99; margin-bottom:10px; }
+  .badge-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; }
+  .badge-card{
+    background: var(--paper); border:2px solid var(--glass-line); border-radius:16px;
+    padding:14px 10px; text-align:center; position:relative;
+  }
+  .badge-card.locked{ opacity:.55; }
+  .badge-icon-wrap{
+    width:52px; height:52px; margin:0 auto 8px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:26px;
+    background: #EFE3F3;
+  }
+  .badge-card.earned.tier-bronze .badge-icon-wrap{ background: linear-gradient(160deg,#F0C08A,#B9723A); }
+  .badge-card.earned.tier-silver .badge-icon-wrap{ background: linear-gradient(160deg,#E7EDF3,#9AA7B8); }
+  .badge-card.earned.tier-gold .badge-icon-wrap{ background: linear-gradient(160deg,#FFEBA8,#E8B93A); }
+  .badge-card.earned.tier-rainbow .badge-icon-wrap{
+    background: linear-gradient(120deg,#FF6B8B,#FFD36B,#7BE0A8,#6BC5FF,#C58BFF);
+    background-size:260% 260%; animation: rainbowShift 3.5s ease-in-out infinite;
+  }
+  .badge-name{ font-weight:700; font-size:12.5px; color:var(--ink); margin-bottom:2px; }
+  .badge-desc{ font-size:10.5px; color:#8A6B99; line-height:1.4; }
+  .badge-card.earned{ cursor:pointer; }
+  .badge-card.equipped{ box-shadow: 0 0 0 2px var(--pink-deep); }
+  .badge-equipped-tag{
+    position:absolute; top:8px; right:8px; background:var(--pink-deep); color:#fff;
+    font-size:9px; font-weight:700; border-radius:999px; padding:2px 7px;
+  }
+
+  .badge-earned-icon{
+    width:84px; height:84px; margin:6px auto 12px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:42px;
+    background: #EFE3F3; box-shadow: 0 8px 18px rgba(0,0,0,.12);
+  }
+  .badge-earned-icon.tier-bronze{ background: linear-gradient(160deg,#F0C08A,#B9723A); }
+  .badge-earned-icon.tier-silver{ background: linear-gradient(160deg,#E7EDF3,#9AA7B8); }
+  .badge-earned-icon.tier-gold{ background: linear-gradient(160deg,#FFEBA8,#E8B93A); }
+  .badge-earned-icon.tier-rainbow{
+    background: linear-gradient(120deg,#FF6B8B,#FFD36B,#7BE0A8,#6BC5FF,#C58BFF);
+    background-size:260% 260%; animation: rainbowShift 3.5s ease-in-out infinite;
+  }
+  .badge-earned-name{ font-weight:700; font-size:17px; color:var(--ink); margin-bottom:4px; }
+  .badge-earned-desc{ font-size:12px; color:#8A6B99; margin-bottom:18px; }
+
   /* toast / overlay */
   .toast{ position:absolute; left:50%; bottom:20px; transform:translateX(-50%) translateY(20px); background: rgba(74,46,88,.92); color:#fff; font-size:12px; font-weight:700; padding:9px 18px; border-radius:999px; opacity:0; pointer-events:none; transition: opacity .2s ease, transform .2s ease; z-index:50; white-space:nowrap; }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
@@ -262,6 +322,7 @@
       <div class="top-hud">
         <div class="gold-badge"><div class="gold-coin"></div><span id="titleGold">300</span></div>
         <div class="icon-row">
+          <div class="icon-btn badge-slot" id="btnOpenBadges">🏅</div>
           <div class="icon-btn" id="btnMuteTitle">🔊</div>
         </div>
       </div>
@@ -337,6 +398,18 @@
       <div class="level-select-grid" id="levelGrid"></div>
     </div>
 
+    <!-- ============ BADGES ============ -->
+    <div class="view" id="view-badges">
+      <div class="top-hud">
+        <div class="icon-btn" data-back>←</div>
+        <div class="gold-badge"><div class="gold-coin"></div><span id="badgesGold">300</span></div>
+        <div style="width:34px"></div>
+      </div>
+      <div class="view-head"><h2>バッジコレクション</h2></div>
+      <div class="badge-hint" id="badgeHint">タップして装着するバッジを選べます</div>
+      <div class="badge-grid" id="badgeGrid"></div>
+    </div>
+
     <!-- ============ SHOP ============ -->
     <div class="view" id="view-shop">
       <div class="top-hud">
@@ -397,7 +470,18 @@
         <div class="tuto-step"><div class="emoji">🌈</div><div class="txt">レベル6以降、まれに<b>虹色ジェリー</b>が登場。どんな色にも重ねられる万能ワイルドカードです</div></div>
         <div class="tuto-step"><div class="emoji">❄️</div><div class="txt">レベル8以降は<b>凍ったジャー</b>も登場。あと数手プレイすると自然に溶けます</div></div>
         <div class="tuto-step"><div class="emoji">⚔️</div><div class="txt">5の倍数レベルは<b>ボスレベル</b>。大瓶(容量5)で手強くなる代わりに報酬も1.5倍！</div></div>
+        <div class="tuto-step"><div class="emoji">🏅</div><div class="txt">節目のレベルや実績を達成すると<b>バッジ</b>がもらえます。タイトル画面上部で装着して見せびらかそう！</div></div>
         <button class="jar-btn primary" id="btnTutoClose" style="width:100%;">はじめる！</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="badgeEarnedOverlay">
+      <div class="overlay-card">
+        <h2>バッジ獲得！</h2>
+        <div class="badge-earned-icon" id="badgeEarnedIcon">🏅</div>
+        <div class="badge-earned-name" id="badgeEarnedName">バッジ名</div>
+        <div class="badge-earned-desc" id="badgeEarnedDesc">説明</div>
+        <button class="jar-btn primary" id="btnBadgeEarnedClose" style="width:100%;">やったね！</button>
       </div>
     </div>
 
@@ -414,6 +498,21 @@
   let CAPACITY = 4; // mutable — boss levels use 5-unit "big bottle" jars, set per level in generateLevel()
   const MAX_JARS = 11;
   const RAINBOW_ID = -1; // wildcard "color" — matches any color when pouring
+
+  // Collectible badges — earned via milestones, displayed on the title screen when equipped.
+  const BADGE_DEFS = [
+    { id:"level10",         name:"見習い菓子職人",     desc:"レベル10をクリア",              icon:"🍬", tier:"bronze",  check:s=>s.bestLevel>=10 },
+    { id:"level20",         name:"一人前の魔法職人",   desc:"レベル20をクリア",              icon:"🏆", tier:"silver",  check:s=>s.bestLevel>=20 },
+    { id:"level30",         name:"熟練の錬金術士",     desc:"レベル30をクリア",              icon:"⚗️", tier:"silver",  check:s=>s.bestLevel>=30 },
+    { id:"level50",         name:"伝説のマイスター",   desc:"レベル50をクリア",              icon:"👑", tier:"gold",    check:s=>s.bestLevel>=50 },
+    { id:"bossSlayer",      name:"ボス討伐者",         desc:"ボスレベルを5回クリア",         icon:"⚔️", tier:"silver",  check:s=>s.lifetimeStats.totalBossClears>=5 },
+    { id:"superBossVictor", name:"頂点に立つ者",       desc:"スーパーボスレベルをクリア",     icon:"💎", tier:"rainbow", check:s=>s.lifetimeStats.totalSuperBossClears>=1 },
+    { id:"star3x10",        name:"完璧主義者",         desc:"★3を10回獲得",                 icon:"⭐", tier:"gold",    check:s=>s.lifetimeStats.totalStar3>=10 },
+    { id:"noItemMaster",    name:"無双の腕前",         desc:"ノーアイテムクリアを5回達成",   icon:"✨", tier:"silver",  check:s=>s.lifetimeStats.totalNoItem>=5 },
+    { id:"goldCollector",   name:"ゴールドコレクター", desc:"累計3,000ゴールドを稼ぐ",       icon:"💰", tier:"bronze",  check:s=>s.lifetimeStats.totalGoldEarned>=3000 },
+    { id:"loyalPlayer",     name:"常連さん",           desc:"7日間プレイする",               icon:"📅", tier:"bronze",  check:s=>s.loginDay>=7 },
+    { id:"rainbowUser",     name:"虹の魔法使い",       desc:"虹色ジェリーのあるレベルをクリア", icon:"🌈", tier:"gold",  check:s=>s.lifetimeStats.rainbowClears>=1 }
+  ];
 
   // Pool of possible daily missions — 3 are drawn at random each day for variety.
   const MISSION_POOL = [
@@ -454,7 +553,11 @@
     playerId: null,
     playerName: null,
     lastActiveDate: null,
-    unlockedLevel: 1
+    unlockedLevel: 1,
+    lifetimeStats: { totalClears:0, totalBossClears:0, totalSuperBossClears:0, totalStar3:0, totalNoItem:0, totalGoldEarned:0, rainbowClears:0 },
+    earnedBadges: [],
+    equippedBadge: null,
+    currentLevelHadRainbow: false
   };
 
   const SHOP_ITEMS = [
@@ -488,6 +591,9 @@
         moves: state.moves,
         lockedJars: [...state.lockedJars],
         unlockedLevel: state.unlockedLevel,
+        lifetimeStats: state.lifetimeStats,
+        earnedBadges: state.earnedBadges,
+        equippedBadge: state.equippedBadge,
         frozenJarIdx: state.frozenJarIdx,
         frozenMeltAtMoves: state.frozenMeltAtMoves,
         capacity: CAPACITY
@@ -525,6 +631,12 @@
     if(!state.unlockedLevel){
       state.unlockedLevel = Math.max(state.level || 1, state.bestLevel || 1, 1);
     }
+    // migration: saves created before the badge system existed
+    if(!state.lifetimeStats){
+      state.lifetimeStats = { totalClears:0, totalBossClears:0, totalSuperBossClears:0, totalStar3:0, totalNoItem:0, totalGoldEarned:0, rainbowClears:0 };
+    }
+    if(!Array.isArray(state.earnedBadges)) state.earnedBadges = [];
+    if(state.equippedBadge===undefined) state.equippedBadge = null;
   }
 
   // handles the daily login-bonus day counter and resets daily missions once per calendar day
@@ -777,6 +889,7 @@
   // ---------- gold helper (also drives "earn gold" mission) ----------
   function addGold(amount){
     state.gold += amount;
+    state.lifetimeStats.totalGoldEarned += amount;
     updateMissionProgress("gold", amount, true);
   }
 
@@ -790,11 +903,44 @@
     return state.missions.filter(m=>!m.claimed && m.progress>=m.target).length;
   }
 
+  // ---------- BADGES ----------
+  let badgeQueue = [];
+  let badgeOverlayShowing = false;
+
+  function checkBadgeUnlocks(){
+    let changed = false;
+    BADGE_DEFS.forEach(b=>{
+      if(!state.earnedBadges.includes(b.id) && b.check(state)){
+        state.earnedBadges.push(b.id);
+        badgeQueue.push(b.id);
+        if(!state.equippedBadge) state.equippedBadge = b.id; // wear the first one automatically
+        changed = true;
+      }
+    });
+    if(changed) saveGame();
+    processBadgeQueue();
+  }
+  function processBadgeQueue(){
+    if(badgeOverlayShowing || badgeQueue.length===0) return;
+    const def = BADGE_DEFS.find(b=>b.id===badgeQueue.shift());
+    if(!def) return processBadgeQueue();
+    badgeOverlayShowing = true;
+    const icon = document.getElementById("badgeEarnedIcon");
+    icon.textContent = def.icon;
+    icon.className = "badge-earned-icon tier-"+def.tier;
+    document.getElementById("badgeEarnedName").textContent = def.name;
+    document.getElementById("badgeEarnedDesc").textContent = def.desc;
+    sfx.win();
+    badgeEarnedOverlay.classList.add("show");
+    spawnConfetti(document.querySelector("#badgeEarnedOverlay .overlay-card"));
+  }
+
   // ---------- DOM refs ----------
   const views = {
     title: document.getElementById("view-title"),
     game: document.getElementById("view-game"),
     levels: document.getElementById("view-levels"),
+    badges: document.getElementById("view-badges"),
     shop: document.getElementById("view-shop"),
     missions: document.getElementById("view-missions"),
     ranking: document.getElementById("view-ranking")
@@ -802,12 +948,14 @@
   const jarGrid = document.getElementById("jarGrid");
   const toastEl = document.getElementById("toast");
   const winOverlay = document.getElementById("winOverlay");
+  const badgeEarnedOverlay = document.getElementById("badgeEarnedOverlay");
 
   function showView(name){
     Object.values(views).forEach(v=>v.classList.remove("active"));
     views[name].classList.add("active");
     if(name==="title") renderTitle();
     if(name==="levels") renderLevelSelect();
+    if(name==="badges") renderBadges();
     if(name==="shop") renderShop();
     if(name==="missions") renderMissions();
     if(name==="ranking") renderRanking();
@@ -821,7 +969,7 @@
   }
 
   function syncGoldDisplays(){
-    ["titleGold","goldValue","shopGold","missionsGold"].forEach(id=>{
+    ["titleGold","goldValue","shopGold","missionsGold","levelsGold","badgesGold"].forEach(id=>{
       const el=document.getElementById(id);
       if(el) el.textContent = state.gold.toLocaleString();
     });
@@ -840,6 +988,13 @@
     document.getElementById("loginDayLabel").textContent = state.loginDay + "日目";
     document.getElementById("loginClaimLabel").textContent = state.loginClaimedToday ? "受け取り済み" : "受け取る ▸";
     ribbon.classList.toggle("claimed", state.loginClaimedToday);
+
+    const badgeSlot = document.getElementById("btnOpenBadges");
+    const equipped = BADGE_DEFS.find(b=>b.id===state.equippedBadge);
+    badgeSlot.textContent = equipped ? equipped.icon : "🏅";
+    badgeSlot.className = "icon-btn badge-slot" + (equipped ? " tier-"+equipped.tier+" filled" : "");
+
+    checkBadgeUnlocks();
     saveGame();
   }
 
@@ -863,6 +1018,7 @@
   document.getElementById("btnGoRank").addEventListener("click", ()=>showView("ranking"));
   document.getElementById("btnGoMissions").addEventListener("click", ()=>showView("missions"));
   document.getElementById("btnGoLevels").addEventListener("click", ()=>showView("levels"));
+  document.getElementById("btnOpenBadges").addEventListener("click", ()=>showView("badges"));
   document.getElementById("btnMuteTitle").addEventListener("click", ()=>{
     state.muted=!state.muted;
     document.getElementById("btnMuteTitle").textContent = state.muted ? "🔇" : "🔊";
@@ -903,6 +1059,37 @@
       grid.appendChild(btn);
     }
   }
+
+  function renderBadges(){
+    syncGoldDisplays();
+    const grid = document.getElementById("badgeGrid");
+    grid.innerHTML = "";
+    BADGE_DEFS.forEach(b=>{
+      const earned = state.earnedBadges.includes(b.id);
+      const equipped = state.equippedBadge===b.id;
+      const card = document.createElement("div");
+      card.className = "badge-card" + (earned ? " earned tier-"+b.tier : " locked") + (equipped ? " equipped" : "");
+      card.innerHTML = `
+        <div class="badge-icon-wrap">${earned ? b.icon : "🔒"}</div>
+        <div class="badge-name">${earned ? b.name : "？？？"}</div>
+        <div class="badge-desc">${b.desc}</div>
+        ${equipped ? '<div class="badge-equipped-tag">装着中</div>' : ""}
+      `;
+      if(earned){
+        card.addEventListener("click", ()=>{
+          state.equippedBadge = (state.equippedBadge===b.id) ? null : b.id;
+          saveGame();
+          renderBadges();
+        });
+      }
+      grid.appendChild(card);
+    });
+  }
+  document.getElementById("btnBadgeEarnedClose").addEventListener("click", ()=>{
+    badgeEarnedOverlay.classList.remove("show");
+    badgeOverlayShowing = false;
+    setTimeout(processBadgeQueue, 300);
+  });
 
   // ---------- SHOP ----------
   function renderShop(){
@@ -1122,6 +1309,7 @@
     state.level = level; state.jars = gen.jars; state.numColors = gen.numColors;
     state.selected = null; state.moves = 0; state.history = [];
     state.toolUsedThisLevel = false;
+    state.currentLevelHadRainbow = numRainbowForLevel(level) > 0;
     clearHintTimer();
 
     // Lock and freeze are temporary restrictions, not permanent blockers: a locked jar
@@ -1282,18 +1470,28 @@
     const noItemBonus = state.toolUsedThisLevel ? 0 : (30 + state.level*3);
     let reward = 60 + state.level*10 + stars*20 + noItemBonus;
     const boss = isBossLevel(state.level);
+    const superBoss = isSuperBossLevel(state.level);
     if(boss) reward = Math.round(reward * 1.5);
     addGold(reward);
     updateMissionProgress("clear", 1, true);
     if(stars===3) updateMissionProgress("star3", 1, true);
     if(noItemBonus>0) updateMissionProgress("noItem", 1, true);
     if(boss) updateMissionProgress("boss", 1, true);
+
+    state.lifetimeStats.totalClears++;
+    if(stars===3) state.lifetimeStats.totalStar3++;
+    if(noItemBonus>0) state.lifetimeStats.totalNoItem++;
+    if(boss) state.lifetimeStats.totalBossClears++;
+    if(superBoss) state.lifetimeStats.totalSuperBossClears++;
+    if(state.currentLevelHadRainbow) state.lifetimeStats.rainbowClears++;
+
     const improved = state.level > state.bestLevel;
     state.bestLevel = Math.max(state.bestLevel, state.level);
     if(state.level >= state.unlockedLevel){
       state.unlockedLevel = state.level + 1; // advance the frontier — this was a new clear, not a replay
     }
     if(improved) submitScoreIfPossible();
+    checkBadgeUnlocks();
 
     document.getElementById("overlayStars").textContent = "★".repeat(stars) + "☆".repeat(3-stars);
     document.getElementById("rewardValue").textContent = "+" + reward;
