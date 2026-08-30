@@ -389,7 +389,7 @@
         <div class="tuto-step"><div class="emoji">🫙</div><div class="txt">別のジャーをタップして<b>注ぐ</b>。同じ色の上にしか置けません</div></div>
         <div class="tuto-step"><div class="emoji">🎉</div><div class="txt">すべてのジャーが「空」か「<b>同じ色でいっぱい</b>」になったらクリア！</div></div>
         <div class="tuto-step"><div class="emoji">✨</div><div class="txt">少し迷っていると、注げる相手が<b>緑色に光ってヒント</b>してくれます</div></div>
-        <div class="tuto-step"><div class="emoji">🔒</div><div class="txt">レベル5以降は<b>ロックされたジャー</b>が登場。ほかの色を1つそろえると解除されます</div></div>
+        <div class="tuto-step"><div class="emoji">🔒</div><div class="txt">レベル5以降は<b>ロックされたジャー</b>が登場。ほかの色を1つそろえるか、数手プレイすると解除されます</div></div>
         <div class="tuto-step"><div class="emoji">🌈</div><div class="txt">レベル6以降、まれに<b>虹色ジェリー</b>が登場。どんな色にも重ねられる万能ワイルドカードです</div></div>
         <div class="tuto-step"><div class="emoji">❄️</div><div class="txt">レベル8以降は<b>凍ったジャー</b>も登場。あと数手プレイすると自然に溶けます</div></div>
         <div class="tuto-step"><div class="emoji">⚔️</div><div class="txt">5の倍数レベルは<b>ボスレベル</b>。大瓶(容量5)で手強くなる代わりに報酬も1.5倍！</div></div>
@@ -579,6 +579,7 @@
   }
   function isSolved(jars){ return jars.every(isJarSolved); }
   const LOCK_UNLOCK_THRESHOLD = 1; // number of jars that must be solved to release a locked jar
+  const LOCK_HARD_CAP_MOVES = 6; // absolute safety cap: releases after this many moves no matter what
 
   function isBossLevel(level){ return level % 5 === 0; }
   function capacityForLevel(level){ return isBossLevel(level) ? 5 : 4; }
@@ -644,45 +645,6 @@
   }
   function isSolvableHeuristic(initialJars, tries, maxMoves){
     for(let t=0;t<tries;t++) if(greedySolveAttempt(initialJars, maxMoves)) return true;
-    return false;
-  }
-
-  // Same idea as greedySolveAttempt, but respects the actual in-game gating rules:
-  // a locked jar can't be touched until >=1 OTHER jar is solved+full, and a frozen
-  // jar can't be touched until `frozenThaw` moves have been made. Used only to verify
-  // a lock/freeze candidate won't create a real soft-lock before committing to it.
-  function greedySolveAttemptGated(initialJars, maxMoves, lockedIdx, frozenIdx, frozenThaw){
-    let jars = cloneJars(initialJars);
-    let lastMove = null;
-    let localMoves = 0;
-    for(let step=0; step<maxMoves; step++){
-      if(isSolved(jars)) return true;
-      const lockedActive = lockedIdx!==null && !jars.some((j,i) => i!==lockedIdx && j.length===CAPACITY && isJarSolved(j));
-      const frozenActive = frozenIdx!==null && localMoves < frozenThaw;
-      let moves = allValidMoves(jars).filter(([i,j]) =>
-        !(lockedActive && (i===lockedIdx || j===lockedIdx)) &&
-        !(frozenActive && (i===frozenIdx || j===frozenIdx))
-      );
-      moves = moves.filter(([i,j]) => !(lastMove && i===lastMove[1] && j===lastMove[0]));
-      if(moves.length===0) return false;
-      const completing = moves.filter(([i,j]) => {
-        const amt = pourAmount(jars,i,j);
-        if(jars[j].length + amt !== CAPACITY) return false;
-        const preview = cloneJars(jars);
-        doPour(preview, i, j);
-        return isJarSolved(preview[j]);
-      });
-      const pick = completing.length>0
-        ? completing[Math.floor(Math.random()*completing.length)]
-        : moves[Math.floor(Math.random()*moves.length)];
-      doPour(jars, pick[0], pick[1]);
-      lastMove = pick;
-      localMoves++;
-    }
-    return isSolved(jars);
-  }
-  function isSolvableGated(initialJars, lockedIdx, frozenIdx, frozenThaw, tries, maxMoves){
-    for(let t=0;t<tries;t++) if(greedySolveAttemptGated(initialJars, maxMoves, lockedIdx, frozenIdx, frozenThaw)) return true;
     return false;
   }
 
@@ -1057,41 +1019,31 @@
     state.selected = null; state.moves = 0; state.history = [];
     state.toolUsedThisLevel = false;
     clearHintTimer();
+
+    // Lock and freeze are temporary restrictions, not permanent blockers: a locked jar
+    // always releases within LOCK_HARD_CAP_MOVES moves (sooner if another color is
+    // completed first), and a frozen jar always thaws after frozenMeltAtMoves moves.
+    // Because release is guaranteed purely by move count — never by requiring the
+    // player to have actually solved something difficult — the underlying board
+    // (already verified solvable on its own) stays solvable no matter which jar is
+    // picked, so no extra per-candidate verification is needed here.
     state.lockedJars = new Set();
+    if(level >= 5 && !isBossLevel(level)){
+      const candidates = state.jars.map((j,i)=>i).filter(i => state.jars[i].length>0 && !isJarSolved(state.jars[i]));
+      if(candidates.length > 0){
+        state.lockedJars.add(candidates[Math.floor(Math.random()*candidates.length)]);
+      }
+    }
     state.frozenJarIdx = null;
     state.frozenMeltAtMoves = 0;
-
-    // Lock and freeze are gameplay restrictions layered on TOP of an already-verified
-    // solvable board. That combination can occasionally create a real soft-lock (a jar
-    // that's needed early but isn't reachable yet), so before committing to either
-    // mechanic we re-verify solvability under the actual gating rules. At most one of
-    // the two mechanics is used per level — trying to satisfy both at once turned out
-    // to be unreliable on hard boards, so we prefer whichever verifies first.
-    const wantLock = level >= 5;
-    const wantFrozen = level >= 8 || isBossLevel(level);
-    if(wantLock || wantFrozen){
-      const gateMaxMoves = state.numColors * CAPACITY * 10;
-      const candidates = shuffleArray(
-        state.jars.map((j,i)=>i).filter(i => state.jars[i].length>0 && !isJarSolved(state.jars[i]))
-      ).slice(0, 8);
-
-      let picked = null, pickedType = null;
-      if(wantLock){
-        for(const c of candidates){
-          if(isSolvableGated(state.jars, c, null, 0, 40, gateMaxMoves)){ picked = c; pickedType = "lock"; break; }
-        }
+    if(level >= 8 && !isBossLevel(level)){
+      const frozenCandidates = state.jars.map((j,i)=>i).filter(i =>
+        state.jars[i].length>0 && !isJarSolved(state.jars[i]) && !state.lockedJars.has(i)
+      );
+      if(frozenCandidates.length > 0){
+        state.frozenJarIdx = frozenCandidates[Math.floor(Math.random()*frozenCandidates.length)];
+        state.frozenMeltAtMoves = 4;
       }
-      if(picked===null && wantFrozen){
-        for(const c of candidates){
-          if(isSolvableGated(state.jars, null, c, 5, 40, gateMaxMoves)){ picked = c; pickedType = "frozen"; break; }
-        }
-      }
-      if(picked!==null){
-        if(pickedType==="lock") state.lockedJars.add(picked);
-        else { state.frozenJarIdx = picked; state.frozenMeltAtMoves = 5; }
-      }
-      // if nothing verified within budget, the level simply ships without the extra
-      // flourish this time — safer than risking an unsolvable board.
     }
 
     document.getElementById("starsRow").textContent = "☆ ☆ ☆";
@@ -1109,7 +1061,7 @@
     return state.jars.filter(j=>j.length===CAPACITY && isJarSolved(j)).length;
   }
   function isLocked(idx){
-    return state.lockedJars.has(idx) && solvedCountNow() < LOCK_UNLOCK_THRESHOLD;
+    return state.lockedJars.has(idx) && solvedCountNow() < LOCK_UNLOCK_THRESHOLD && state.moves < LOCK_HARD_CAP_MOVES;
   }
 
   // Safety net: even with generation-time verification, a heuristic solver can't give
@@ -1168,7 +1120,7 @@
       const bodyEls = jarGrid.querySelectorAll(".jar-body");
       if(bodyEls[idx]) bodyEls[idx].classList.add("shake");
       setTimeout(()=>{ const el=jarGrid.querySelectorAll(".jar-body")[idx]; if(el) el.classList.remove("shake"); },300);
-      showToast("🔒 ロック中：先にほかの色を1つそろえよう");
+      showToast("🔒 ロック中：ほかの色を1つそろえるか、あと" + Math.max(0, LOCK_HARD_CAP_MOVES - state.moves) + "手で解除されます");
       return;
     }
     if(isFrozen(idx)){
