@@ -140,6 +140,7 @@
   .ice-icon span{ font-family: var(--font-num); font-weight:700; font-size:12px; color:#fff; background: rgba(74,46,88,.55); border-radius:999px; padding:0 7px; }
 
   .jar-grid.big-bottle-mode .jar{ aspect-ratio: 3/5.6; }
+  .jar-grid.super-bottle-mode .jar{ aspect-ratio: 3/6.4; }
 
   .boss-banner{
     display:none; text-align:center; font-family:'Yomogi', cursive; font-size:14px; font-weight:700;
@@ -148,6 +149,7 @@
     box-shadow: 0 3px 0 rgba(0,0,0,.12);
   }
   .boss-banner.show{ display:block; }
+  .boss-banner.super{ color:#fff; background: linear-gradient(180deg, #C6AEEA, var(--grape-deep)); }
   @keyframes targetPulse{ 0%,100%{ transform: scale(1);} 50%{ transform: scale(1.045);} }
   .goal-hint{ text-align:center; font-size:11px; color:#8A6B99; margin-bottom:2px; line-height:1.5; }
   .goal-hint b{ color:var(--pink-deep); font-family:var(--font-num); }
@@ -219,6 +221,7 @@
   .level-btn.current{ background: linear-gradient(180deg, #FF8FBB, var(--pink-deep)); }
   .level-btn.replay{ background: linear-gradient(180deg, #A9E4D0, var(--mint-deep)); }
   .level-btn.boss{ background: linear-gradient(180deg, #FFD98A, #E8813A); }
+  .level-btn.super{ background: linear-gradient(180deg, #C6AEEA, var(--grape-deep)); }
 
   /* toast / overlay */
   .toast{ position:absolute; left:50%; bottom:20px; transform:translateX(-50%) translateY(20px); background: rgba(74,46,88,.92); color:#fff; font-size:12px; font-weight:700; padding:9px 18px; border-radius:999px; opacity:0; pointer-events:none; transition: opacity .2s ease, transform .2s ease; z-index:50; white-space:nowrap; }
@@ -412,17 +415,34 @@
   const MAX_JARS = 11;
   const RAINBOW_ID = -1; // wildcard "color" — matches any color when pouring
 
+  // Pool of possible daily missions — 3 are drawn at random each day for variety.
+  const MISSION_POOL = [
+    { id:"clear",   name:"レベルを1つクリアする",         target:1,   reward:60, icon:"🎯" },
+    { id:"hint",    name:"ヒントを1回使う",               target:1,   reward:40, icon:"💡" },
+    { id:"gold",    name:"ゴールドを150稼ぐ",             target:150, reward:80, icon:"💰" },
+    { id:"moves",   name:"30手プレイする",                target:30,  reward:50, icon:"👆" },
+    { id:"shuffle", name:"シャッフルを1回使う",           target:1,   reward:40, icon:"🔀" },
+    { id:"addjar",  name:"ボトル追加を1回使う",           target:1,   reward:40, icon:"🫙" },
+    { id:"star3",   name:"★3でクリアする",                target:1,   reward:70, icon:"⭐" },
+    { id:"noItem",  name:"ノーアイテムでクリアする",       target:1,   reward:70, icon:"✨" },
+    { id:"boss",    name:"ボスレベルをクリアする",         target:1,   reward:100,icon:"⚔️" }
+  ];
+  function pickDailyMissions(){
+    const shuffled = MISSION_POOL.slice();
+    for(let i=shuffled.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];
+    }
+    return shuffled.slice(0,3).map(m => ({ ...m, progress:0, claimed:false }));
+  }
+
   let state = {
     level: 1, gold: 300,
     jars: [], numColors: 4, selected: null, moves: 0, history: [],
     muted: false,
     showTargetHighlight: false,
     inventory: { hint: 1, shuffle: 1, bottle: 1 },
-    missions: [
-      { id:"clear",  name:"レベルを1つクリアする",      target:1,   progress:0, reward:60,  claimed:false, icon:"🎯" },
-      { id:"hint",   name:"ヒントを1回使う",            target:1,   progress:0, reward:40,  claimed:false, icon:"💡" },
-      { id:"gold",   name:"ゴールドを150稼ぐ",          target:150, progress:0, reward:80,  claimed:false, icon:"💰" }
-    ],
+    missions: pickDailyMissions(),
     loginDay: 1,
     loginClaimedToday: false,
     bestLevel: 1,
@@ -514,7 +534,7 @@
       if(state.lastActiveDate){ // not the very first run
         state.loginDay = (state.loginDay || 0) + 1;
         state.loginClaimedToday = false;
-        state.missions.forEach(m => { m.progress = 0; m.claimed = false; });
+        state.missions = pickDailyMissions();
       }
       state.lastActiveDate = today;
     }
@@ -659,7 +679,11 @@
   const LOCK_HARD_CAP_MOVES = 6; // absolute safety cap: releases after this many moves no matter what
 
   function isBossLevel(level){ return level % 5 === 0; }
-  function capacityForLevel(level){ return isBossLevel(level) ? 5 : 4; }
+  function isSuperBossLevel(level){ return level % 20 === 0; } // every 4th boss level — an extra difficulty spike
+  function capacityForLevel(level){
+    if(isSuperBossLevel(level)) return 6; // "super bottles" — endgame difficulty keeps climbing past level 20
+    return isBossLevel(level) ? 5 : 4;
+  }
   function numColorsForLevel(level){
     let n = 4 + Math.floor((level-1)/1.5);
     if(isBossLevel(level)) n += 1; // boss levels spike in difficulty
@@ -669,6 +693,7 @@
   function numRainbowForLevel(level){
     let n = level < 6 ? 0 : Math.min(1 + Math.floor((level-6)/5), 3); // rare wildcard segments, capped at 3
     if(isBossLevel(level)) n = Math.min(n + 1, 4); // boss levels get one extra wildcard
+    if(isSuperBossLevel(level)) n = Math.min(n + 1, 5); // super boss levels get one more still
     return n;
   }
 
@@ -732,9 +757,9 @@
     const numRainbow = numRainbowForLevel(level);
     const maxMoves = numColors * CAPACITY * 10;
 
-    for(let attempt=0; attempt<120; attempt++){
+    for(let attempt=0; attempt<150; attempt++){
       const jars = randomDistribute(numColors, numEmpty, numRainbow);
-      if(!isSolved(jars) && isSolvableHeuristic(jars, 30, maxMoves)){
+      if(!isSolved(jars) && isSolvableHeuristic(jars, 35, maxMoves)){
         return { jars, numColors };
       }
     }
@@ -866,9 +891,11 @@
     for(let lv=1; lv<=state.unlockedLevel; lv++){
       const btn = document.createElement("button");
       const boss = isBossLevel(lv);
-      btn.className = "level-btn" + (lv===state.unlockedLevel ? " current" : " replay") + (boss ? " boss" : "");
+      const superBoss = isSuperBossLevel(lv);
+      btn.className = "level-btn" + (lv===state.unlockedLevel ? " current" : " replay") + (boss ? " boss" : "") + (superBoss ? " super" : "");
       const label = lv===state.unlockedLevel ? "NEXT" : "★ クリア済み";
-      btn.innerHTML = (boss ? "⚔️" : "") + lv + '<span class="lv-star">' + label + '</span>';
+      const icon = superBoss ? "👑" : (boss ? "⚔️" : "");
+      btn.innerHTML = icon + lv + '<span class="lv-star">' + label + '</span>';
       btn.addEventListener("click", ()=>{
         startLevel(lv);
         showView("game");
@@ -1124,10 +1151,19 @@
     }
 
     document.getElementById("starsRow").textContent = "☆ ☆ ☆";
-    document.getElementById("bossBanner").classList.toggle("show", isBossLevel(level));
-    document.getElementById("jarGrid").classList.toggle("big-bottle-mode", CAPACITY===5);
+    updateBossBannerAndJarSizing(level);
     winOverlay.classList.remove("show");
     renderJars();
+  }
+
+  function updateBossBannerAndJarSizing(level){
+    const banner = document.getElementById("bossBanner");
+    const superBoss = isSuperBossLevel(level);
+    banner.classList.toggle("show", isBossLevel(level));
+    banner.classList.toggle("super", superBoss);
+    banner.textContent = superBoss ? "👑 スーパーボスレベル 👑" : "⚔️ ボスレベル ⚔️";
+    document.getElementById("jarGrid").classList.toggle("big-bottle-mode", CAPACITY===5);
+    document.getElementById("jarGrid").classList.toggle("super-bottle-mode", CAPACITY===6);
   }
 
   function isFrozen(idx){
@@ -1220,6 +1256,7 @@
       state.history.push({ jars: cloneJars(state.jars), moves: state.moves });
       doPour(state.jars, state.selected, idx);
       state.moves++; sfx.pour();
+      updateMissionProgress("moves", 1, true);
       const poured = idx; state.selected = null;
       renderJars(poured);
       if(isSolved(state.jars)){
@@ -1248,6 +1285,9 @@
     if(boss) reward = Math.round(reward * 1.5);
     addGold(reward);
     updateMissionProgress("clear", 1, true);
+    if(stars===3) updateMissionProgress("star3", 1, true);
+    if(noItemBonus>0) updateMissionProgress("noItem", 1, true);
+    if(boss) updateMissionProgress("boss", 1, true);
     const improved = state.level > state.bestLevel;
     state.bestLevel = Math.max(state.bestLevel, state.level);
     if(state.level >= state.unlockedLevel){
@@ -1301,6 +1341,7 @@
     if(state.inventory.shuffle<=0 && state.gold<80){ showToast("ゴールドが足りません"); return; }
     if(state.inventory.shuffle>0) state.inventory.shuffle--; else state.gold-=80;
     state.toolUsedThisLevel = true;
+    updateMissionProgress("shuffle", 1, true);
     const gen = generateLevel(state.level);
     const extra = state.jars.length - gen.jars.length;
     state.jars = gen.jars;
@@ -1314,6 +1355,7 @@
     if(state.inventory.bottle<=0 && state.gold<120){ showToast("ゴールドが足りません"); return; }
     if(state.inventory.bottle>0) state.inventory.bottle--; else state.gold-=120;
     state.toolUsedThisLevel = true;
+    updateMissionProgress("addjar", 1, true);
     state.history.push({ jars: cloneJars(state.jars), moves: state.moves });
     state.jars.push([]);
     renderJars(); showToast("ボトルを追加しました");
@@ -1334,8 +1376,7 @@
     state.selected = null;
     state.lockedJars = state.lockedJars instanceof Set ? state.lockedJars : new Set(state.lockedJars || []);
     winOverlay.classList.remove("show");
-    document.getElementById("bossBanner").classList.toggle("show", isBossLevel(state.level));
-    document.getElementById("jarGrid").classList.toggle("big-bottle-mode", CAPACITY===5);
+    updateBossBannerAndJarSizing(state.level);
     renderJars();
   } else {
     startLevel(state.unlockedLevel || 1);
