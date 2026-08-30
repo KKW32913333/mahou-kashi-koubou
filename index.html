@@ -647,6 +647,45 @@
     return false;
   }
 
+  // Same idea as greedySolveAttempt, but respects the actual in-game gating rules:
+  // a locked jar can't be touched until >=1 OTHER jar is solved+full, and a frozen
+  // jar can't be touched until `frozenThaw` moves have been made. Used only to verify
+  // a lock/freeze candidate won't create a real soft-lock before committing to it.
+  function greedySolveAttemptGated(initialJars, maxMoves, lockedIdx, frozenIdx, frozenThaw){
+    let jars = cloneJars(initialJars);
+    let lastMove = null;
+    let localMoves = 0;
+    for(let step=0; step<maxMoves; step++){
+      if(isSolved(jars)) return true;
+      const lockedActive = lockedIdx!==null && !jars.some((j,i) => i!==lockedIdx && j.length===CAPACITY && isJarSolved(j));
+      const frozenActive = frozenIdx!==null && localMoves < frozenThaw;
+      let moves = allValidMoves(jars).filter(([i,j]) =>
+        !(lockedActive && (i===lockedIdx || j===lockedIdx)) &&
+        !(frozenActive && (i===frozenIdx || j===frozenIdx))
+      );
+      moves = moves.filter(([i,j]) => !(lastMove && i===lastMove[1] && j===lastMove[0]));
+      if(moves.length===0) return false;
+      const completing = moves.filter(([i,j]) => {
+        const amt = pourAmount(jars,i,j);
+        if(jars[j].length + amt !== CAPACITY) return false;
+        const preview = cloneJars(jars);
+        doPour(preview, i, j);
+        return isJarSolved(preview[j]);
+      });
+      const pick = completing.length>0
+        ? completing[Math.floor(Math.random()*completing.length)]
+        : moves[Math.floor(Math.random()*moves.length)];
+      doPour(jars, pick[0], pick[1]);
+      lastMove = pick;
+      localMoves++;
+    }
+    return isSolved(jars);
+  }
+  function isSolvableGated(initialJars, lockedIdx, frozenIdx, frozenThaw, tries, maxMoves){
+    for(let t=0;t<tries;t++) if(greedySolveAttemptGated(initialJars, maxMoves, lockedIdx, frozenIdx, frozenThaw)) return true;
+    return false;
+  }
+
   function generateLevel(level){
     CAPACITY = capacityForLevel(level);
     const numColors = numColorsForLevel(level);
@@ -1019,23 +1058,42 @@
     state.toolUsedThisLevel = false;
     clearHintTimer();
     state.lockedJars = new Set();
-    if(level >= 5){
-      const candidates = state.jars.map((j,i)=>i).filter(i => state.jars[i].length>0 && !isJarSolved(state.jars[i]));
-      if(candidates.length > 1){
-        state.lockedJars.add(candidates[Math.floor(Math.random()*candidates.length)]);
-      }
-    }
     state.frozenJarIdx = null;
     state.frozenMeltAtMoves = 0;
-    if(level >= 8 || isBossLevel(level)){
-      const frozenCandidates = state.jars.map((j,i)=>i).filter(i =>
-        state.jars[i].length>0 && !isJarSolved(state.jars[i]) && !state.lockedJars.has(i)
-      );
-      if(frozenCandidates.length > 0){
-        state.frozenJarIdx = frozenCandidates[Math.floor(Math.random()*frozenCandidates.length)];
-        state.frozenMeltAtMoves = 3;
+
+    // Lock and freeze are gameplay restrictions layered on TOP of an already-verified
+    // solvable board. That combination can occasionally create a real soft-lock (a jar
+    // that's needed early but isn't reachable yet), so before committing to either
+    // mechanic we re-verify solvability under the actual gating rules. At most one of
+    // the two mechanics is used per level — trying to satisfy both at once turned out
+    // to be unreliable on hard boards, so we prefer whichever verifies first.
+    const wantLock = level >= 5;
+    const wantFrozen = level >= 8 || isBossLevel(level);
+    if(wantLock || wantFrozen){
+      const gateMaxMoves = state.numColors * CAPACITY * 10;
+      const candidates = shuffleArray(
+        state.jars.map((j,i)=>i).filter(i => state.jars[i].length>0 && !isJarSolved(state.jars[i]))
+      ).slice(0, 8);
+
+      let picked = null, pickedType = null;
+      if(wantLock){
+        for(const c of candidates){
+          if(isSolvableGated(state.jars, c, null, 0, 40, gateMaxMoves)){ picked = c; pickedType = "lock"; break; }
+        }
       }
+      if(picked===null && wantFrozen){
+        for(const c of candidates){
+          if(isSolvableGated(state.jars, null, c, 5, 40, gateMaxMoves)){ picked = c; pickedType = "frozen"; break; }
+        }
+      }
+      if(picked!==null){
+        if(pickedType==="lock") state.lockedJars.add(picked);
+        else { state.frozenJarIdx = picked; state.frozenMeltAtMoves = 5; }
+      }
+      // if nothing verified within budget, the level simply ships without the extra
+      // flourish this time — safer than risking an unsolvable board.
     }
+
     document.getElementById("starsRow").textContent = "☆ ☆ ☆";
     document.getElementById("bossBanner").classList.toggle("show", isBossLevel(level));
     document.getElementById("jarGrid").classList.toggle("big-bottle-mode", CAPACITY===5);
@@ -1052,6 +1110,20 @@
   }
   function isLocked(idx){
     return state.lockedJars.has(idx) && solvedCountNow() < LOCK_UNLOCK_THRESHOLD;
+  }
+
+  // Safety net: even with generation-time verification, a heuristic solver can't give
+  // an absolute 100% guarantee. If the player ever genuinely has zero legal moves left
+  // (accounting for lock/freeze) and the board isn't solved, recover automatically
+  // instead of leaving them stuck with no way to finish the level.
+  function hasAnyPlayableMove(){
+    return allValidMoves(state.jars).some(([i,j]) => !isLocked(i) && !isLocked(j) && !isFrozen(i) && !isFrozen(j));
+  }
+  function checkAndRecoverFromDeadlock(){
+    if(state.jars.length===0 || isSolved(state.jars)) return;
+    if(hasAnyPlayableMove()) return;
+    showToast("😵 手詰まりを検出したため、無料で盤面を立て直しました");
+    startLevel(state.level);
   }
 
   // ---------- "thinking too long" hint highlight ----------
@@ -1121,7 +1193,11 @@
       state.moves++; sfx.pour();
       const poured = idx; state.selected = null;
       renderJars(poured);
-      if(isSolved(state.jars)) setTimeout(onLevelClear, 260);
+      if(isSolved(state.jars)){
+        setTimeout(onLevelClear, 260);
+      } else {
+        setTimeout(checkAndRecoverFromDeadlock, 320);
+      }
     } else {
       sfx.error();
       const bodyEls = jarGrid.querySelectorAll(".jar-body");
