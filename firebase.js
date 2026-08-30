@@ -8,12 +8,12 @@
 // 取得方法は README.md の「Firebase ランキング設定」を参照してください。
 // ============================================================
 const firebaseConfig = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT.firebaseapp.com",
-  projectId:         "YOUR_PROJECT",
-  storageBucket:      "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID"
+  apiKey:            "AIzaSyD2hcs9rsUQLlVr215MXdtqNgT7iTtJUnE...",
+  authDomain:        "mahou-kashi-koubou.firebaseapp.com",
+  projectId:         "mahou-kashi-koubou",
+  storageBucket:      "mahou-kashi-koubou.firebasestorage.app",
+  messagingSenderId: "74452903353",
+  appId:             "1:74452903353:web:28add72b83f5187f2e0268"
 };
 
 (function () {
