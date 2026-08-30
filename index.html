@@ -106,6 +106,11 @@
   .tagline-plain{ font-size:12.5px; color:#6B5473; }
 
   .menu-zone{ display:flex; flex-direction:column; gap:10px; padding-bottom:2px; }
+  .level-select-link{
+    text-align:center; font-size:12px; font-weight:700; color: var(--pink-deep);
+    background: rgba(255,255,255,.7); border-radius:999px; padding:6px 0; cursor:pointer;
+    margin-top:-2px;
+  }
   .pill-btn{
     display:flex; align-items:center; justify-content:center; gap:8px;
     font-family: var(--font-body); font-weight:700; font-size:16px; color:#fff;
@@ -199,6 +204,18 @@
   .rank-name{ flex:1; font-size:13px; font-weight:700; color:var(--ink); }
   .rank-score{ font-family:var(--font-num); font-weight:700; font-size:12px; color:#8A6B99; }
 
+  .level-select-grid{ display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; }
+  .level-btn{
+    aspect-ratio:1; border-radius:16px; border:none; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    font-family: var(--font-num); font-weight:700; font-size:16px; color:#fff;
+    background: linear-gradient(180deg, var(--mint), var(--mint-deep));
+    box-shadow: 0 4px 0 rgba(0,0,0,.12);
+  }
+  .level-btn .lv-star{ font-size:10px; opacity:.9; }
+  .level-btn.current{ background: linear-gradient(180deg, #FF8FBB, var(--pink-deep)); }
+  .level-btn.replay{ background: linear-gradient(180deg, #A9E4D0, var(--mint-deep)); }
+
   /* toast / overlay */
   .toast{ position:absolute; left:50%; bottom:20px; transform:translateX(-50%) translateY(20px); background: rgba(74,46,88,.92); color:#fff; font-size:12px; font-weight:700; padding:9px 18px; border-radius:999px; opacity:0; pointer-events:none; transition: opacity .2s ease, transform .2s ease; z-index:50; white-space:nowrap; }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
@@ -253,6 +270,7 @@
       </div>
       <div class="menu-zone">
         <button class="pill-btn start" id="btnStart">▶ スタート (LEVEL <span id="titleLevel">1</span>)</button>
+        <div class="level-select-link" id="btnGoLevels">🗂️ クリア済みレベルを選んで遊ぶ ▸</div>
         <div class="pill-row">
           <button class="pill-btn shop" id="btnGoShop">🛒 ショップ</button>
           <button class="pill-btn rank" id="btnGoRank">🏆 ランキング</button>
@@ -298,6 +316,17 @@
           <span class="label">シャッフル</span>
         </div>
       </div>
+    </div>
+
+    <!-- ============ LEVEL SELECT ============ -->
+    <div class="view" id="view-levels">
+      <div class="top-hud">
+        <div class="icon-btn" data-back>←</div>
+        <div class="gold-badge"><div class="gold-coin"></div><span id="levelsGold">300</span></div>
+        <div style="width:34px"></div>
+      </div>
+      <div class="view-head"><h2>レベルを選ぶ</h2></div>
+      <div class="level-select-grid" id="levelGrid"></div>
     </div>
 
     <!-- ============ SHOP ============ -->
@@ -393,7 +422,8 @@
     lockedJars: new Set(),
     playerId: null,
     playerName: null,
-    lastActiveDate: null
+    lastActiveDate: null,
+    unlockedLevel: 1
   };
 
   const SHOP_ITEMS = [
@@ -425,7 +455,8 @@
         jars: state.jars,
         numColors: state.numColors,
         moves: state.moves,
-        lockedJars: [...state.lockedJars]
+        lockedJars: [...state.lockedJars],
+        unlockedLevel: state.unlockedLevel
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     }catch(e){
@@ -454,6 +485,10 @@
     }
     if(!state.playerName){
       state.playerName = "こうぼう" + Math.floor(1000 + Math.random()*9000);
+    }
+    // migration: saves created before level-select existed won't have unlockedLevel yet
+    if(!state.unlockedLevel){
+      state.unlockedLevel = Math.max(state.level || 1, state.bestLevel || 1, 1);
     }
   }
 
@@ -612,6 +647,7 @@
   const views = {
     title: document.getElementById("view-title"),
     game: document.getElementById("view-game"),
+    levels: document.getElementById("view-levels"),
     shop: document.getElementById("view-shop"),
     missions: document.getElementById("view-missions"),
     ranking: document.getElementById("view-ranking")
@@ -624,6 +660,7 @@
     Object.values(views).forEach(v=>v.classList.remove("active"));
     views[name].classList.add("active");
     if(name==="title") renderTitle();
+    if(name==="levels") renderLevelSelect();
     if(name==="shop") renderShop();
     if(name==="missions") renderMissions();
     if(name==="ranking") renderRanking();
@@ -645,7 +682,8 @@
 
   // ---------- TITLE ----------
   function renderTitle(){
-    document.getElementById("titleLevel").textContent = state.level;
+    const resumeLevel = (state.jars.length>0 && !isSolved(state.jars)) ? state.level : state.unlockedLevel;
+    document.getElementById("titleLevel").textContent = resumeLevel;
     syncGoldDisplays();
     document.getElementById("btnMuteTitle").textContent = state.muted ? "🔇" : "🔊";
     const badge = document.getElementById("missionBadge");
@@ -660,7 +698,7 @@
 
   const tutorialOverlay = document.getElementById("tutorialOverlay");
   document.getElementById("btnStart").addEventListener("click", ()=>{
-    if(state.jars.length===0 || isSolved(state.jars)) startLevel(state.level);
+    if(state.jars.length===0 || isSolved(state.jars)) startLevel(state.unlockedLevel);
     showView("game");
     if(!state.tutorialSeen){
       tutorialOverlay.classList.add("show");
@@ -677,6 +715,7 @@
   document.getElementById("btnGoShop").addEventListener("click", ()=>showView("shop"));
   document.getElementById("btnGoRank").addEventListener("click", ()=>showView("ranking"));
   document.getElementById("btnGoMissions").addEventListener("click", ()=>showView("missions"));
+  document.getElementById("btnGoLevels").addEventListener("click", ()=>showView("levels"));
   document.getElementById("btnMuteTitle").addEventListener("click", ()=>{
     state.muted=!state.muted;
     document.getElementById("btnMuteTitle").textContent = state.muted ? "🔇" : "🔊";
@@ -696,6 +735,23 @@
     btn.addEventListener("click", ()=>showView("title"));
   });
   document.getElementById("btnBackToTitle").addEventListener("click", ()=>{ clearHintTimer(); showView("title"); });
+
+  // ---------- LEVEL SELECT ----------
+  function renderLevelSelect(){
+    syncGoldDisplays();
+    const grid = document.getElementById("levelGrid");
+    grid.innerHTML = "";
+    for(let lv=1; lv<=state.unlockedLevel; lv++){
+      const btn = document.createElement("button");
+      btn.className = "level-btn" + (lv===state.unlockedLevel ? " current" : " replay");
+      btn.innerHTML = lv + (lv===state.unlockedLevel ? '<span class="lv-star">NEXT</span>' : '<span class="lv-star">★ クリア済み</span>');
+      btn.addEventListener("click", ()=>{
+        startLevel(lv);
+        showView("game");
+      });
+      grid.appendChild(btn);
+    }
+  }
 
   // ---------- SHOP ----------
   function renderShop(){
@@ -1002,6 +1058,9 @@
     updateMissionProgress("clear", 1, true);
     const improved = state.level > state.bestLevel;
     state.bestLevel = Math.max(state.bestLevel, state.level);
+    if(state.level >= state.unlockedLevel){
+      state.unlockedLevel = state.level + 1; // advance the frontier — this was a new clear, not a replay
+    }
     if(improved) submitScoreIfPossible();
 
     document.getElementById("overlayStars").textContent = "★".repeat(stars) + "☆".repeat(3-stars);
@@ -1082,7 +1141,7 @@
     winOverlay.classList.remove("show");
     renderJars();
   } else {
-    startLevel(state.level || 1);
+    startLevel(state.unlockedLevel || 1);
   }
   showView("title");
   saveGame();
