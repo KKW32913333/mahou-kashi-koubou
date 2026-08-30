@@ -4,8 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>魔法菓子工房</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#FF7FAE">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Yomogi&family=Zen+Maru+Gothic:wght@400;500;700;900&family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<!-- Firebase (used for the online ranking; see firebase.js to configure your own project) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase.js"></script>
 <style>
   :root{
     --bg-1: #FFF2FA; --bg-2: #E9F7FF;
@@ -293,6 +301,10 @@
         <div style="width:34px"></div>
       </div>
       <div class="view-head"><h2>殿堂ランキング</h2></div>
+      <div class="ribbon" id="btnRenamePlayer" style="margin-top:0;margin-bottom:12px;">
+        <span>あなたの名前: <b id="rankPlayerName">-</b></span>
+        <span>変更 ▸</span>
+      </div>
       <div class="card-list" id="rankList"></div>
     </div>
 
@@ -348,7 +360,10 @@
     bestLevel: 1,
     tutorialSeen: false,
     toolUsedThisLevel: false,
-    lockedJars: new Set()
+    lockedJars: new Set(),
+    playerId: null,
+    playerName: null,
+    lastActiveDate: null
   };
 
   const SHOP_ITEMS = [
@@ -358,6 +373,72 @@
     { id:"skinA",   icon:"🧪", name:"テーマ: 錬金術師の工房", desc:"近日追加予定のテーマスキン", price:null, disabled:true },
     { id:"skinB",   icon:"💎", name:"テーマ: 星霜の宝石鉱山", desc:"近日追加予定のテーマスキン", price:null, disabled:true }
   ];
+
+  // ---------- save / load (localStorage) ----------
+  const SAVE_KEY = "magicCandyWorkshop_save_v1";
+
+  function saveGame(){
+    try{
+      const data = {
+        gold: state.gold,
+        level: state.level,
+        bestLevel: state.bestLevel,
+        inventory: state.inventory,
+        missions: state.missions,
+        loginDay: state.loginDay,
+        loginClaimedToday: state.loginClaimedToday,
+        lastActiveDate: state.lastActiveDate,
+        muted: state.muted,
+        tutorialSeen: state.tutorialSeen,
+        playerId: state.playerId,
+        playerName: state.playerName,
+        jars: state.jars,
+        numColors: state.numColors,
+        moves: state.moves,
+        lockedJars: [...state.lockedJars]
+      };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    }catch(e){
+      // localStorage unavailable (private browsing, sandboxed preview, etc.) - fail silently
+    }
+  }
+
+  function loadGame(){
+    try{
+      const raw = localStorage.getItem(SAVE_KEY);
+      if(!raw) return false;
+      const data = JSON.parse(raw);
+      Object.assign(state, data);
+      state.lockedJars = new Set(data.lockedJars || []);
+      state.selected = null;
+      state.history = [];
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  function ensurePlayerIdentity(){
+    if(!state.playerId){
+      state.playerId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ("p_" + Math.random().toString(36).slice(2) + Date.now());
+    }
+    if(!state.playerName){
+      state.playerName = "こうぼう" + Math.floor(1000 + Math.random()*9000);
+    }
+  }
+
+  // handles the daily login-bonus day counter and resets daily missions once per calendar day
+  function applyDailyReset(){
+    const today = new Date().toDateString();
+    if(state.lastActiveDate !== today){
+      if(state.lastActiveDate){ // not the very first run
+        state.loginDay = (state.loginDay || 0) + 1;
+        state.loginClaimedToday = false;
+        state.missions.forEach(m => { m.progress = 0; m.claimed = false; });
+      }
+      state.lastActiveDate = today;
+    }
+  }
 
   // ---------- audio ----------
   let actx = null;
@@ -544,6 +625,7 @@
     document.getElementById("loginDayLabel").textContent = state.loginDay + "日目";
     document.getElementById("loginClaimLabel").textContent = state.loginClaimedToday ? "受け取り済み" : "受け取る ▸";
     ribbon.classList.toggle("claimed", state.loginClaimedToday);
+    saveGame();
   }
 
   const tutorialOverlay = document.getElementById("tutorialOverlay");
@@ -560,6 +642,7 @@
   document.getElementById("btnTutoClose").addEventListener("click", ()=>{
     state.tutorialSeen = true;
     tutorialOverlay.classList.remove("show");
+    saveGame();
   });
   document.getElementById("btnGoShop").addEventListener("click", ()=>showView("shop"));
   document.getElementById("btnGoRank").addEventListener("click", ()=>showView("ranking"));
@@ -567,6 +650,7 @@
   document.getElementById("btnMuteTitle").addEventListener("click", ()=>{
     state.muted=!state.muted;
     document.getElementById("btnMuteTitle").textContent = state.muted ? "🔇" : "🔊";
+    saveGame();
   });
   document.getElementById("loginRibbon").addEventListener("click", ()=>{
     if(state.loginClaimedToday){ showToast("本日分は受け取り済みです"); return; }
@@ -612,6 +696,7 @@
       }
       list.appendChild(card);
     });
+    saveGame();
   }
 
   // ---------- MISSIONS ----------
@@ -646,27 +731,22 @@
       }
       list.appendChild(card);
     });
+    saveGame();
   }
 
-  // ---------- RANKING (mock hall of fame + player's session best) ----------
-  function renderRanking(){
-    const sample = [
-      { name:"あんず", score: 42 },
-      { name:"みかん", score: 38 },
-      { name:"ラムネ", score: 35 },
-      { name:"ぶどう", score: 29 },
-      { name:"はちみつ", score: 24 },
-      { name:"もも", score: 19 }
-    ];
-    const rows = sample.map(p=>({ name:p.name, score:p.score, me:false }));
-    rows.push({ name:"あなた", score: state.bestLevel, me:true });
-    rows.sort((a,b)=>b.score-a.score);
-
+  // ---------- RANKING (Firebase-backed when configured, local mock fallback otherwise) ----------
+  function renderRankRows(rows, note){
     const list = document.getElementById("rankList");
     list.innerHTML = "";
-    rows.forEach((r,idx)=>{
+    if(note){
+      const noteEl = document.createElement("div");
+      noteEl.style.cssText = "text-align:center;font-size:10px;color:#9B7CB0;margin-bottom:4px;";
+      noteEl.textContent = note;
+      list.appendChild(noteEl);
+    }
+    rows.forEach((r, idx) => {
       const row = document.createElement("div");
-      row.className = "rank-row" + (r.me ? " me":"");
+      row.className = "rank-row" + (r.me ? " me" : "");
       row.innerHTML = `
         <div class="rank-pos">${idx+1}</div>
         <div class="rank-name">${r.name}</div>
@@ -675,6 +755,51 @@
       list.appendChild(row);
     });
   }
+
+  function renderLocalRanking(){
+    const sample = [
+      { name:"あんず", score: 42 }, { name:"みかん", score: 38 }, { name:"ラムネ", score: 35 },
+      { name:"ぶどう", score: 29 }, { name:"はちみつ", score: 24 }, { name:"もも", score: 19 }
+    ];
+    const rows = sample.map(p => ({ name:p.name, score:p.score, me:false }));
+    rows.push({ name: state.playerName + "(あなた)", score: state.bestLevel, me:true });
+    rows.sort((a,b) => b.score - a.score);
+    renderRankRows(rows, "サンプル表示（Firebase未設定のためローカル表示）");
+  }
+
+  function renderRanking(){
+    document.getElementById("rankPlayerName").textContent = state.playerName;
+    if(window.CandyFirebase && window.CandyFirebase.enabled()){
+      const list = document.getElementById("rankList");
+      list.innerHTML = '<div style="text-align:center;font-size:12px;color:#9B7CB0;padding:20px 0;">読み込み中...</div>';
+      window.CandyFirebase.fetchTopScores(20).then(rows => {
+        if(!rows || rows.length===0){ renderLocalRanking(); return; }
+        const mapped = rows.map(r => ({ name:r.name, score:r.score, me: r.id===state.playerId }));
+        if(!mapped.some(r=>r.me)){
+          mapped.push({ name: state.playerName + "(あなた)", score: state.bestLevel, me:true });
+        }
+        renderRankRows(mapped);
+      }).catch(()=>renderLocalRanking());
+    } else {
+      renderLocalRanking();
+    }
+  }
+
+  function submitScoreIfPossible(){
+    if(window.CandyFirebase && window.CandyFirebase.enabled()){
+      window.CandyFirebase.submitScore(state.playerId, state.playerName, state.bestLevel);
+    }
+  }
+
+  document.getElementById("btnRenamePlayer").addEventListener("click", () => {
+    const input = window.prompt("ランキングに表示する名前を入力してください（12文字まで）", state.playerName);
+    if(input && input.trim()){
+      state.playerName = input.trim().slice(0,12);
+      saveGame();
+      submitScoreIfPossible();
+      renderRanking();
+    }
+  });
 
   // ---------- GAME ----------
   function updateHud(){
@@ -702,6 +827,7 @@
     const par = Math.round(state.numColors * 2.5);
     const lockNote = state.lockedJars.size>0 && isLocked([...state.lockedJars][0]) ? " ・ 🔒あり" : "";
     document.getElementById("progressHint").innerHTML = "そろった色 <b>"+solvedCount+"</b> / "+state.numColors+" ・ ★3は<b>"+par+"手</b>以内" + lockNote;
+    saveGame();
   }
 
   function renderJars(justPouredInto){
@@ -824,7 +950,9 @@
     const reward = 60 + state.level*10 + stars*20 + bonus;
     addGold(reward);
     updateMissionProgress("clear", 1, true);
+    const improved = state.level > state.bestLevel;
     state.bestLevel = Math.max(state.bestLevel, state.level);
+    if(improved) submitScoreIfPossible();
 
     document.getElementById("overlayStars").textContent = "★".repeat(stars) + "☆".repeat(3-stars);
     document.getElementById("rewardValue").textContent = "+" + reward;
@@ -890,8 +1018,23 @@
   });
 
   // ---------- boot ----------
-  startLevel(1);
+  const hadSave = loadGame();
+  ensurePlayerIdentity();
+  applyDailyReset();
+
+  if(hadSave && Array.isArray(state.jars) && state.jars.length > 0 && !isSolved(state.jars)){
+    // resume exactly where the player left off, including a mid-level board
+    state.selected = null;
+    state.lockedJars = state.lockedJars instanceof Set ? state.lockedJars : new Set(state.lockedJars || []);
+    winOverlay.classList.remove("show");
+    renderJars();
+  } else {
+    startLevel(state.level || 1);
+  }
   showView("title");
+  saveGame();
+
+  window.addEventListener("beforeunload", saveGame);
 })();
 </script>
 
