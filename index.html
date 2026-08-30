@@ -50,7 +50,8 @@
      The mockup frame (with notch) is kept only for larger screens (desktop/tablet),
      where it's shown purely as a presentation frame. */
   @media (max-width: 560px){
-    body{ padding:0; align-items:stretch; justify-content:stretch; background: var(--bg-2); }
+    html, body{ height:100dvh; min-height:100dvh; overflow:hidden; }
+    body{ padding:0; align-items:stretch; justify-content:stretch; background: linear-gradient(180deg, var(--bg-1), var(--bg-2)); }
     .phone{ width:100vw; height:100dvh; max-height:none; border-radius:0; padding:0; box-shadow:none; background:transparent; }
     .phone .notch{ display:none; }
     .screen{ border-radius:0; }
@@ -109,9 +110,9 @@
   .menu-icons{ display:flex; gap:10px; }
   .menu-icons .jar-btn{ flex:1; font-size:12px; padding:12px 0; }
   .level-select-link{
-    text-align:center; font-size:12px; font-weight:700; color: var(--pink-deep);
-    background: rgba(255,255,255,.7); border-radius:999px; padding:6px 0; cursor:pointer;
-    margin-top:-2px;
+    text-align:center; font-size:12.5px; font-weight:700; color: var(--pink-deep);
+    background: var(--paper); border: 2px dashed var(--glass-line); border-radius:999px; padding:8px 0; cursor:pointer;
+    box-shadow: 0 3px 0 rgba(0,0,0,.08);
   }
 
   .ribbon{ background:var(--paper); border:2px dashed var(--glass-line); border-radius:14px; padding:8px 10px; font-size:11px; color:#7A6485; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
@@ -538,6 +539,82 @@
     win:()=>{beep(660,0.12); setTimeout(()=>beep(880,0.16),120); setTimeout(()=>beep(990,0.22),260);},
     select:()=>beep(760,0.06,"triangle"), coin:()=>beep(920,0.08,"triangle")
   };
+
+  // ---------- BGM (generative, loops forever, no audio files) ----------
+  // A gentle music-box style melody over a soft pad chord, built entirely from
+  // oscillators so it works offline and needs no external assets.
+  const BGM_MELODY = [ // [semitone offset from C5, beats] — a cute, looping pentatonic tune
+    [0,1],[2,1],[4,1],[7,1], [4,1],[2,1],[0,2],
+    [7,1],[9,1],[7,1],[4,1], [2,1],[0,1],[-3,2],
+    [0,1],[4,1],[7,1],[9,1], [7,1],[4,1],[2,2],
+    [-1,1],[2,1],[4,1],[2,1],[0,2],[null,2]
+  ];
+  const BGM_PAD_CHORDS = [ // root semitone offsets, held under each 8-beat phrase
+    -12, -12, -8, -8
+  ];
+  const BEAT_MS = 340;
+  let bgmState = { started:false, stopped:false, noteIdx:0, timer:null, padOsc:null, padGain:null };
+
+  function noteFreq(semitoneFromC5){
+    return 523.25 * Math.pow(2, semitoneFromC5/12);
+  }
+  function playBgmNote(semitone, beats){
+    if(semitone===null) return;
+    try{
+      if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+      const t0 = actx.currentTime;
+      const dur = (beats*BEAT_MS/1000);
+      const osc = actx.createOscillator(), gain = actx.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = noteFreq(semitone);
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(0.05, t0+0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0+dur*0.92);
+      osc.connect(gain); gain.connect(actx.destination);
+      osc.start(t0); osc.stop(t0+dur);
+    }catch(e){}
+  }
+  function swapBgmPad(){
+    try{
+      if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+      if(bgmState.padOsc){
+        const oldGain = bgmState.padGain;
+        oldGain.gain.cancelScheduledValues(actx.currentTime);
+        oldGain.gain.setValueAtTime(oldGain.gain.value, actx.currentTime);
+        oldGain.gain.linearRampToValueAtTime(0, actx.currentTime+0.6);
+        const oldOsc = bgmState.padOsc;
+        setTimeout(()=>{ try{ oldOsc.stop(); }catch(e){} }, 700);
+      }
+      const phraseIdx = Math.floor(bgmState.noteIdx / 7) % BGM_PAD_CHORDS.length;
+      const osc = actx.createOscillator(), gain = actx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = noteFreq(BGM_PAD_CHORDS[phraseIdx]);
+      gain.gain.setValueAtTime(0, actx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.02, actx.currentTime+0.8);
+      osc.connect(gain); gain.connect(actx.destination);
+      osc.start();
+      bgmState.padOsc = osc; bgmState.padGain = gain;
+    }catch(e){}
+  }
+  function bgmTick(){
+    if(bgmState.stopped) return;
+    if(state.muted){ bgmState.timer = setTimeout(bgmTick, 500); return; }
+    if(bgmState.noteIdx % 7 === 0) swapBgmPad();
+    const [semitone, beats] = BGM_MELODY[bgmState.noteIdx % BGM_MELODY.length];
+    playBgmNote(semitone, beats);
+    bgmState.noteIdx++;
+    bgmState.timer = setTimeout(bgmTick, beats*BEAT_MS);
+  }
+  function startBgm(){
+    if(bgmState.started) return;
+    bgmState.started = true;
+    bgmState.stopped = false;
+    try{
+      if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+      if(actx.state === "suspended") actx.resume();
+    }catch(e){}
+    bgmTick();
+  }
 
   // ---------- puzzle logic ----------
   function cloneJars(jars){ return jars.map(j=>j.slice()); }
@@ -1267,6 +1344,14 @@
   saveGame();
 
   window.addEventListener("beforeunload", saveGame);
+
+  // Browsers require a user gesture before audio can start — kick off BGM on the
+  // first tap/click anywhere, so it's playing by the time the player is on the title screen.
+  function beginBgmOnFirstGesture(){
+    startBgm();
+    document.removeEventListener("pointerdown", beginBgmOnFirstGesture);
+  }
+  document.addEventListener("pointerdown", beginBgmOnFirstGesture, { once:true });
 })();
 </script>
 
