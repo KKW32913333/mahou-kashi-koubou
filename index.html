@@ -120,8 +120,8 @@
   .ribbon.claimed{ opacity:.5; cursor:default; }
 
   /* ---------------- GAME ---------------- */
-  .stars-row{ display:flex; justify-content:center; gap:5px; margin:6px 0 4px; font-size:15px; color:var(--lemon-deep); }
-  .moves-row{ text-align:center; font-size:11px; color:#8A6B99; margin-bottom:6px; }
+  .stars-row{ display:flex; justify-content:center; gap:5px; margin:6px 0 4px; font-size:17px; color:var(--lemon-deep); text-shadow: 0 1px 0 rgba(255,255,255,.6); }
+  .moves-row{ text-align:center; font-size:12.5px; font-weight:700; color: var(--ink); margin-bottom:6px; }
   .jar-grid{ flex:1; display:grid; grid-template-columns: repeat(3, 1fr); gap:16px 8px; align-content:center; justify-items:center; padding:4px 2px 8px; }
   .jar{ width:100%; max-width:78px; aspect-ratio:3/4.6; position:relative; cursor:pointer; transition: transform .12s ease; }
   .jar.pop{ transform: translateY(-8px); }
@@ -151,7 +151,7 @@
   .boss-banner.show{ display:block; }
   .boss-banner.super{ color:#fff; background: linear-gradient(180deg, #C6AEEA, var(--grape-deep)); }
   @keyframes targetPulse{ 0%,100%{ transform: scale(1);} 50%{ transform: scale(1.045);} }
-  .goal-hint{ text-align:center; font-size:11px; color:#8A6B99; margin-bottom:2px; line-height:1.5; }
+  .goal-hint{ text-align:center; font-size:12.5px; font-weight:700; color: var(--ink); margin-bottom:3px; line-height:1.6; }
   .goal-hint b{ color:var(--pink-deep); font-family:var(--font-num); }
   .seg{ position:relative; flex-shrink:0; }
   .seg::after{ content:""; display:block; width:100%; height:100%; background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0) 45%); }
