@@ -140,11 +140,28 @@ service cloud.firestore {
                    && request.resource.data.name is string
                    && request.resource.data.name.size() <= 12;
     }
+    match /cloudSaves/{doc} {
+      allow read, write: if request.resource.data.data is string
+                          && request.resource.data.data.size() < 200000;
+    }
   }
 }
 ```
 
 設定後、レベルクリアで自己ベストが更新されるたびに自動でスコアが送信され、ランキング画面が上位20件のオンラインデータを表示するようになります。
+
+---
+
+## ☁️ クラウド同期コードについて
+
+Firebaseを設定すると、ゴールドや進行状況が自動的にクラウド（Firestoreの`cloudSaves`コレクション）にもバックアップされます。
+
+- 初回プレイ時に、端末ごとに一意の**同期コード**（例: `AB3D-7F2K`）が自動発行されます
+- タイトル画面の「☁️ 同期コード」から確認・コピーできます
+- 別の端末で同じコードを入力すると、そちらにも同じ進行状況を復元できます
+
+**⚠️ 重要な注意**
+この仕組みはパスワード保護のないシンプルな方式です。同期コードを知っている人は誰でもそのデータを読み書きできます。他人と共有しないよう注意してください。より厳格なセキュリティ（アカウント認証など）が必要な場合は、Firebase Authenticationの導入を検討してください。
 
 ---
 

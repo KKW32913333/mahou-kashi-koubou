@@ -114,6 +114,8 @@
     background: var(--paper); border: 2px dashed var(--glass-line); border-radius:999px; padding:8px 0; cursor:pointer;
     box-shadow: 0 3px 0 rgba(0,0,0,.08);
   }
+  .mini-link-row{ display:flex; gap:8px; }
+  .mini-link-row .level-select-link{ flex:1; font-size:11.5px; padding:8px 4px; }
 
   .ribbon{ background:var(--paper); border:2px dashed var(--glass-line); border-radius:14px; padding:8px 10px; font-size:11px; color:#7A6485; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
   .ribbon b{ color: var(--pink-deep); font-family: var(--font-num); }
@@ -286,6 +288,24 @@
   .badge-earned-name{ font-weight:700; font-size:17px; color:var(--ink); margin-bottom:4px; }
   .badge-earned-desc{ font-size:12px; color:#8A6B99; margin-bottom:18px; }
 
+  /* ---------------- CLOUD SYNC ---------------- */
+  .sync-code-card, .sync-restore-card{
+    background: var(--paper); border:2px solid var(--glass-line); border-radius:16px;
+    padding:16px; text-align:center; margin-bottom:14px;
+  }
+  .sync-code-label{ font-size:12px; font-weight:700; color:#8A6B99; margin-bottom:8px; }
+  .sync-code-value{
+    font-family: var(--font-num); font-weight:700; font-size:24px; letter-spacing:.06em;
+    color: var(--ink); background:#F3E9F7; border-radius:12px; padding:12px 8px; margin-bottom:12px;
+  }
+  .sync-code-note{ font-size:10.5px; color:#8A6B99; line-height:1.5; margin-top:10px; }
+  .sync-code-note.warn{ color: var(--pink-deep); }
+  .sync-code-input{
+    width:100%; font-family: var(--font-num); font-weight:700; font-size:18px; text-align:center;
+    letter-spacing:.06em; color:var(--ink); background:#F3E9F7; border:2px solid var(--glass-line);
+    border-radius:12px; padding:12px 8px; margin-bottom:12px; text-transform:uppercase;
+  }
+
   /* toast / overlay */
   .toast{ position:absolute; left:50%; bottom:20px; transform:translateX(-50%) translateY(20px); background: rgba(74,46,88,.92); color:#fff; font-size:12px; font-weight:700; padding:9px 18px; border-radius:999px; opacity:0; pointer-events:none; transition: opacity .2s ease, transform .2s ease; z-index:50; white-space:nowrap; }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
@@ -332,7 +352,10 @@
       <div class="logo-zone"></div>
       <div class="menu-zone">
         <button class="jar-btn primary" id="btnStart">スタート (LEVEL <span id="titleLevel">1</span>)</button>
-        <div class="level-select-link" id="btnGoLevels">🗂️ クリア済みレベルを選んで遊ぶ ▸</div>
+        <div class="mini-link-row">
+          <div class="level-select-link" id="btnGoLevels">🗂️ レベル選択 ▸</div>
+          <div class="level-select-link" id="btnGoAccount">☁️ 同期コード ▸</div>
+        </div>
         <div class="menu-icons">
           <button class="jar-btn shop" id="btnGoShop">🛒 ショップ</button>
           <button class="jar-btn rank" id="btnGoRank">🏆 ランキング</button>
@@ -402,6 +425,36 @@
       <div class="view-head"><h2>バッジコレクション</h2></div>
       <div class="badge-hint" id="badgeHint">タップして装着するバッジを選べます</div>
       <div class="badge-grid" id="badgeGrid"></div>
+    </div>
+
+    <!-- ============ ACCOUNT / CLOUD SYNC ============ -->
+    <div class="view" id="view-account">
+      <div class="top-hud">
+        <div class="icon-btn" data-back>←</div>
+        <div style="flex:1"></div>
+        <div style="width:34px"></div>
+      </div>
+      <div class="view-head"><h2>クラウド同期コード</h2></div>
+
+      <div id="accountDisabledNotice" style="display:none; text-align:center; font-size:12px; color:#8A6B99; background:var(--paper); border:2px dashed var(--glass-line); border-radius:14px; padding:14px;">
+        クラウド同期は現在このゲームでは設定されていません。<br>進行状況はこの端末のブラウザにのみ保存されます。
+      </div>
+
+      <div id="accountEnabledSection" style="display:none;">
+        <div class="sync-code-card">
+          <div class="sync-code-label">あなたの同期コード</div>
+          <div class="sync-code-value" id="syncCodeValue">----‑----</div>
+          <button class="jar-btn primary" id="btnCopySyncCode" style="width:100%; font-size:13px; padding:11px 0;">📋 コードをコピー</button>
+          <div class="sync-code-note">このコードを控えておくと、別の端末でも同じ進行状況を復元できます。進行状況は数秒ごとに自動でクラウドへバックアップされます。</div>
+        </div>
+
+        <div class="sync-restore-card">
+          <div class="sync-code-label">別の端末のコードで復元</div>
+          <input type="text" id="restoreCodeInput" class="sync-code-input" placeholder="例: AB3D-7F2K" maxlength="9">
+          <button class="jar-btn secondary" id="btnRestoreSyncCode" style="width:100%; font-size:13px; padding:11px 0;">☁️ このコードで復元する</button>
+          <div class="sync-code-note warn">⚠️ 復元すると、この端末の現在の進行状況は上書きされます。</div>
+        </div>
+      </div>
     </div>
 
     <!-- ============ SHOP ============ -->
@@ -551,7 +604,8 @@
     lifetimeStats: { totalClears:0, totalBossClears:0, totalSuperBossClears:0, totalStar3:0, totalNoItem:0, totalGoldEarned:0, rainbowClears:0 },
     earnedBadges: [],
     equippedBadge: null,
-    currentLevelHadRainbow: false
+    currentLevelHadRainbow: false,
+    syncCode: null
   };
 
   const SHOP_ITEMS = [
@@ -565,37 +619,54 @@
   // ---------- save / load (localStorage) ----------
   const SAVE_KEY = "magicCandyWorkshop_save_v1";
 
+  function buildSaveData(){
+    return {
+      gold: state.gold,
+      level: state.level,
+      bestLevel: state.bestLevel,
+      inventory: state.inventory,
+      missions: state.missions,
+      loginDay: state.loginDay,
+      loginClaimedToday: state.loginClaimedToday,
+      lastActiveDate: state.lastActiveDate,
+      muted: state.muted,
+      tutorialSeen: state.tutorialSeen,
+      playerId: state.playerId,
+      playerName: state.playerName,
+      jars: state.jars,
+      numColors: state.numColors,
+      moves: state.moves,
+      lockedJars: [...state.lockedJars],
+      unlockedLevel: state.unlockedLevel,
+      lifetimeStats: state.lifetimeStats,
+      earnedBadges: state.earnedBadges,
+      equippedBadge: state.equippedBadge,
+      frozenJarIdx: state.frozenJarIdx,
+      frozenMeltAtMoves: state.frozenMeltAtMoves,
+      capacity: CAPACITY,
+      syncCode: state.syncCode
+    };
+  }
+
   function saveGame(){
     try{
-      const data = {
-        gold: state.gold,
-        level: state.level,
-        bestLevel: state.bestLevel,
-        inventory: state.inventory,
-        missions: state.missions,
-        loginDay: state.loginDay,
-        loginClaimedToday: state.loginClaimedToday,
-        lastActiveDate: state.lastActiveDate,
-        muted: state.muted,
-        tutorialSeen: state.tutorialSeen,
-        playerId: state.playerId,
-        playerName: state.playerName,
-        jars: state.jars,
-        numColors: state.numColors,
-        moves: state.moves,
-        lockedJars: [...state.lockedJars],
-        unlockedLevel: state.unlockedLevel,
-        lifetimeStats: state.lifetimeStats,
-        earnedBadges: state.earnedBadges,
-        equippedBadge: state.equippedBadge,
-        frozenJarIdx: state.frozenJarIdx,
-        frozenMeltAtMoves: state.frozenMeltAtMoves,
-        capacity: CAPACITY
-      };
-      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      localStorage.setItem(SAVE_KEY, JSON.stringify(buildSaveData()));
     }catch(e){
       // localStorage unavailable (private browsing, sandboxed preview, etc.) - fail silently
     }
+    scheduleCloudBackup();
+  }
+
+  // Cloud backup is debounced — real writes happen at most every few seconds,
+  // no matter how often saveGame() itself is called (which can be very frequent).
+  let cloudBackupTimer = null;
+  function scheduleCloudBackup(){
+    if(!window.CandyFirebase || !window.CandyFirebase.enabled()) return;
+    if(!state.syncCode) return;
+    clearTimeout(cloudBackupTimer);
+    cloudBackupTimer = setTimeout(()=>{
+      window.CandyFirebase.saveCloudState(state.syncCode, buildSaveData());
+    }, 4000);
   }
 
   function loadGame(){
@@ -614,12 +685,42 @@
     }
   }
 
+  function generateSyncCode(){
+    // avoids visually ambiguous characters (0/O, 1/I, etc.)
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for(let i=0;i<8;i++){
+      if(i===4) code += "-";
+      code += chars[Math.floor(Math.random()*chars.length)];
+    }
+    return code;
+  }
+
+  async function restoreFromSyncCode(code){
+    if(!window.CandyFirebase || !window.CandyFirebase.enabled()) return { ok:false, reason:"disabled" };
+    const trimmed = (code || "").trim().toUpperCase();
+    if(!trimmed) return { ok:false, reason:"empty" };
+    const cloudData = await window.CandyFirebase.loadCloudState(trimmed);
+    if(!cloudData) return { ok:false, reason:"notfound" };
+    Object.assign(state, cloudData);
+    state.lockedJars = new Set(cloudData.lockedJars || []);
+    state.selected = null;
+    state.history = [];
+    if(typeof cloudData.capacity === "number") CAPACITY = cloudData.capacity;
+    state.syncCode = trimmed;
+    saveGame();
+    return { ok:true };
+  }
+
   function ensurePlayerIdentity(){
     if(!state.playerId){
       state.playerId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ("p_" + Math.random().toString(36).slice(2) + Date.now());
     }
     if(!state.playerName){
       state.playerName = "こうぼう" + Math.floor(1000 + Math.random()*9000);
+    }
+    if(!state.syncCode && window.CandyFirebase && window.CandyFirebase.enabled()){
+      state.syncCode = generateSyncCode();
     }
     // migration: saves created before level-select existed won't have unlockedLevel yet
     if(!state.unlockedLevel){
@@ -935,6 +1036,7 @@
     game: document.getElementById("view-game"),
     levels: document.getElementById("view-levels"),
     badges: document.getElementById("view-badges"),
+    account: document.getElementById("view-account"),
     shop: document.getElementById("view-shop"),
     missions: document.getElementById("view-missions"),
     ranking: document.getElementById("view-ranking")
@@ -950,6 +1052,7 @@
     if(name==="title") renderTitle();
     if(name==="levels") renderLevelSelect();
     if(name==="badges") renderBadges();
+    if(name==="account") renderAccount();
     if(name==="shop") renderShop();
     if(name==="missions") renderMissions();
     if(name==="ranking") renderRanking();
@@ -1013,6 +1116,7 @@
   document.getElementById("btnGoMissions").addEventListener("click", ()=>showView("missions"));
   document.getElementById("btnGoLevels").addEventListener("click", ()=>showView("levels"));
   document.getElementById("btnOpenBadges").addEventListener("click", ()=>showView("badges"));
+  document.getElementById("btnGoAccount").addEventListener("click", ()=>showView("account"));
   document.getElementById("btnMuteTitle").addEventListener("click", ()=>{
     state.muted=!state.muted;
     document.getElementById("btnMuteTitle").textContent = state.muted ? "🔇" : "🔊";
@@ -1083,6 +1187,46 @@
     badgeEarnedOverlay.classList.remove("show");
     badgeOverlayShowing = false;
     setTimeout(processBadgeQueue, 300);
+  });
+
+  // ---------- ACCOUNT / CLOUD SYNC ----------
+  function renderAccount(){
+    const enabled = window.CandyFirebase && window.CandyFirebase.enabled();
+    document.getElementById("accountDisabledNotice").style.display = enabled ? "none" : "block";
+    document.getElementById("accountEnabledSection").style.display = enabled ? "block" : "none";
+    if(enabled){
+      document.getElementById("syncCodeValue").textContent = state.syncCode || "----‑----";
+    }
+  }
+
+  document.getElementById("btnCopySyncCode").addEventListener("click", async ()=>{
+    if(!state.syncCode) return;
+    try{
+      await navigator.clipboard.writeText(state.syncCode);
+      showToast("コードをコピーしました");
+    }catch(e){
+      showToast("コピーできませんでした。手動で控えてください");
+    }
+  });
+
+  document.getElementById("btnRestoreSyncCode").addEventListener("click", async ()=>{
+    const input = document.getElementById("restoreCodeInput");
+    const code = input.value;
+    if(!code.trim()){ showToast("コードを入力してください"); return; }
+    const sure = window.confirm("この端末の現在の進行状況を、入力したコードのデータで上書きします。よろしいですか？");
+    if(!sure) return;
+    showToast("復元中...");
+    const result = await restoreFromSyncCode(code);
+    if(result.ok){
+      showToast("復元しました！");
+      input.value = "";
+      renderAccount();
+      renderTitle();
+    } else if(result.reason==="notfound"){
+      showToast("そのコードのデータが見つかりませんでした");
+    } else {
+      showToast("復元に失敗しました");
+    }
   });
 
   // ---------- SHOP ----------

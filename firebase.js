@@ -8,12 +8,12 @@
 // 取得方法は README.md の「Firebase ランキング設定」を参照してください。
 // ============================================================
 const firebaseConfig = {
-  apiKey:            "AIzaSyD2hcs9rsUQLlVr215MXdtqNgT7iTtJUnE...",
-  authDomain:        "mahou-kashi-koubou.firebaseapp.com",
-  projectId:         "mahou-kashi-koubou",
-  storageBucket:      "mahou-kashi-koubou.firebasestorage.app",
-  messagingSenderId: "74452903353",
-  appId:             "1:74452903353:web:28add72b83f5187f2e0268"
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  projectId:         "YOUR_PROJECT",
+  storageBucket:      "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 
 (function () {
@@ -65,9 +65,44 @@ const firebaseConfig = {
     }
   }
 
+  // ------------------------------------------------------------
+  // クラウドセーブ（同期コード方式）
+  // バックエンドサーバーやカスタム認証を使わず、プレイヤーが控えておく
+  // 短い「同期コード」をドキュメントIDとして進行状況を保存/復元する。
+  // 同じコードを知っていれば誰でも読み書きできる前提のシンプルな方式
+  // （パスワードではない）なので、コードは十分な長さ・ランダム性を持たせる。
+  // ------------------------------------------------------------
+  async function saveCloudState(code, dataObj) {
+    if (!enabled || !code) return false;
+    try {
+      await db.collection("cloudSaves").doc(code).set({
+        data: JSON.stringify(dataObj),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      return true;
+    } catch (e) {
+      console.warn("[firebase.js] saveCloudState failed:", e);
+      return false;
+    }
+  }
+
+  async function loadCloudState(code) {
+    if (!enabled || !code) return null;
+    try {
+      const doc = await db.collection("cloudSaves").doc(code).get();
+      if (!doc.exists) return null;
+      return JSON.parse(doc.data().data);
+    } catch (e) {
+      console.warn("[firebase.js] loadCloudState failed:", e);
+      return null;
+    }
+  }
+
   window.CandyFirebase = {
     enabled: () => enabled,
     submitScore,
-    fetchTopScores
+    fetchTopScores,
+    saveCloudState,
+    loadCloudState
   };
 })();
