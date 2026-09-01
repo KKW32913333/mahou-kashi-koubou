@@ -461,7 +461,7 @@
         <div class="tuto-step"><div class="emoji">🎉</div><div class="txt">すべてのジャーが「空」か「<b>同じ色でいっぱい</b>」になったらクリア！</div></div>
         <div class="tuto-step"><div class="emoji">✨</div><div class="txt">少し迷っていると、注げる相手が<b>緑色に光ってヒント</b>してくれます</div></div>
         <div class="tuto-step"><div class="emoji">🔒</div><div class="txt">レベル5以降は<b>ロックされたジャー</b>が登場。ほかの色を1つそろえるか、数手プレイすると解除されます</div></div>
-        <div class="tuto-step"><div class="emoji">🌈</div><div class="txt">レベル6以降、まれに<b>虹色ジェリー</b>が登場。どんな色にも重ねられる万能ワイルドカードです</div></div>
+        <div class="tuto-step"><div class="emoji">🌈</div><div class="txt">レベル10以降、まれに<b>虹色ジェリー</b>が登場。どんな色にも重ねられる万能ワイルドカードです</div></div>
         <div class="tuto-step"><div class="emoji">❄️</div><div class="txt">レベル8以降は<b>凍ったジャー</b>も登場。あと数手プレイすると自然に溶けます</div></div>
         <div class="tuto-step"><div class="emoji">⚔️</div><div class="txt">5の倍数レベルは<b>ボスレベル</b>。大瓶(容量5)で手強くなる代わりに報酬も1.5倍！</div></div>
         <div class="tuto-step"><div class="emoji">🏅</div><div class="txt">節目のレベルや実績を達成すると<b>バッジ</b>がもらえます。タイトル画面上部で装着して見せびらかそう！</div></div>
@@ -797,7 +797,7 @@
   }
   function emptyJarsForLevel(level){ return 2; } // 2 spare jars keeps boards reliably solvable at high color counts
   function numRainbowForLevel(level){
-    let n = level < 6 ? 0 : Math.min(1 + Math.floor((level-6)/5), 3); // rare wildcard segments, capped at 3
+    let n = level < 10 ? 0 : Math.min(1 + Math.floor((level-10)/5), 3); // rare wildcard segments, capped at 3
     if(isBossLevel(level)) n = Math.min(n + 1, 4); // boss levels get one extra wildcard
     if(isSuperBossLevel(level)) n = Math.min(n + 1, 5); // super boss levels get one more still
     return n;
