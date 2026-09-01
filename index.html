@@ -971,8 +971,7 @@
 
   // ---------- TITLE ----------
   function renderTitle(){
-    const resumeLevel = (state.jars.length>0 && !isSolved(state.jars)) ? state.level : state.unlockedLevel;
-    document.getElementById("titleLevel").textContent = resumeLevel;
+    document.getElementById("titleLevel").textContent = state.unlockedLevel;
     syncGoldDisplays();
     document.getElementById("btnMuteTitle").textContent = state.muted ? "🔇" : "🔊";
     const badge = document.getElementById("missionBadge");
@@ -994,7 +993,8 @@
 
   const tutorialOverlay = document.getElementById("tutorialOverlay");
   document.getElementById("btnStart").addEventListener("click", ()=>{
-    if(state.jars.length===0 || isSolved(state.jars)) startLevel(state.unlockedLevel);
+    const hasFrontierBoardInProgress = state.jars.length>0 && !isSolved(state.jars) && state.level===state.unlockedLevel;
+    if(!hasFrontierBoardInProgress) startLevel(state.unlockedLevel);
     showView("game");
     if(!state.tutorialSeen){
       tutorialOverlay.classList.add("show");
