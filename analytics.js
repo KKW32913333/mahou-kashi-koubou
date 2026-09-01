@@ -9,7 +9,7 @@
 // 2. 「管理」→ 対象プロパティ →「データストリーム」→ 該当のウェブストリームを選択
 // 3. 「測定ID」（G-XXXXXXXXXX の形式）をコピーして下に貼り付け
 // ============================================================
-const GA4_MEASUREMENT_ID = "G-XXXXXXXXXX";
+const GA4_MEASUREMENT_ID = "G-YM2KN6LD1H";
 
 (function () {
   "use strict";
