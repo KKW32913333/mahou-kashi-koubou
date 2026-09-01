@@ -176,6 +176,12 @@
   }
   .seg.enter{ animation: dropIn .2s ease; }
   @keyframes dropIn{ from{ opacity:0; transform: translateY(-14px);} to{ opacity:1; transform: translateY(0);} }
+  .loading-spinner{
+    width:44px; height:44px; margin:0 auto;
+    border: 5px solid #EFE3F3; border-top-color: var(--pink-deep);
+    border-radius:50%; animation: spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
   .toolbar{ display:flex; justify-content:center; gap:14px; padding-top:6px; }
   .tool-btn{ display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none; cursor:pointer; }
   .tool-circle{ width:50px; height:50px; border-radius:50%; background:var(--paper); border:2.5px solid var(--ink); display:flex; align-items:center; justify-content:center; font-size:20px; box-shadow:0 4px 0 rgba(0,0,0,.12); position:relative; transition: transform .1s ease; }
@@ -462,6 +468,8 @@
           <div class="sync-code-value" id="syncCodeValue">----‑----</div>
           <button class="jar-btn primary" id="btnCopySyncCode" style="width:100%; font-size:13px; padding:11px 0;">📋 コードをコピー</button>
           <div class="sync-code-note">このコードを控えておくと、別の端末でも同じ進行状況を復元できます。進行状況は数秒ごとに自動でクラウドへバックアップされます。</div>
+          <div class="sync-code-note" id="lastSyncNote" style="margin-top:6px; font-weight:700;">最終同期: -</div>
+          <div class="sync-code-note warn">⚠️ 同じコードで2台の端末を同時に遊ぶと、後から保存した方が優先され、もう一方の進行状況が上書きされます。1つのコードは基本的に1台の端末で使うことをおすすめします。</div>
         </div>
 
         <div class="sync-restore-card">
@@ -535,6 +543,13 @@
         <div class="tuto-step"><div class="emoji">⚔️</div><div class="txt">5の倍数レベルは<b>ボスレベル</b>。大瓶(容量5)で手強くなる代わりに報酬も1.5倍！</div></div>
         <div class="tuto-step"><div class="emoji">🏅</div><div class="txt">節目のレベルや実績を達成すると<b>バッジ</b>がもらえます。タイトル画面上部で装着して見せびらかそう！</div></div>
         <button class="jar-btn primary" id="btnTutoClose" style="width:100%;">はじめる！</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="loadingOverlay">
+      <div class="overlay-card" style="padding: 40px 26px;">
+        <div class="loading-spinner"></div>
+        <div id="loadingOverlayText" style="margin-top:16px; font-weight:700; color:var(--ink); font-size:14px;">準備中...</div>
       </div>
     </div>
 
@@ -621,7 +636,8 @@
     earnedBadges: [],
     equippedBadge: null,
     currentLevelHadRainbow: false,
-    syncCode: null
+    syncCode: null,
+    lastCloudSyncAt: null
   };
 
   const SHOP_ITEMS = [
@@ -660,7 +676,8 @@
       frozenJarIdx: state.frozenJarIdx,
       frozenMeltAtMoves: state.frozenMeltAtMoves,
       capacity: CAPACITY,
-      syncCode: state.syncCode
+      syncCode: state.syncCode,
+      lastCloudSyncAt: state.lastCloudSyncAt
     };
   }
 
@@ -680,8 +697,12 @@
     if(!window.CandyFirebase || !window.CandyFirebase.enabled()) return;
     if(!state.syncCode) return;
     clearTimeout(cloudBackupTimer);
-    cloudBackupTimer = setTimeout(()=>{
-      window.CandyFirebase.saveCloudState(state.syncCode, buildSaveData());
+    cloudBackupTimer = setTimeout(async ()=>{
+      const ok = await window.CandyFirebase.saveCloudState(state.syncCode, buildSaveData());
+      if(ok){
+        state.lastCloudSyncAt = Date.now();
+        if(views.account.classList.contains("active")) updateLastSyncNote();
+      }
     }, 4000);
   }
 
@@ -1215,6 +1236,23 @@
   });
 
   // ---------- ACCOUNT / CLOUD SYNC ----------
+  function formatRelativeTime(ts){
+    if(!ts) return "まだ未同期";
+    const diffSec = Math.max(0, Math.round((Date.now()-ts)/1000));
+    if(diffSec < 10) return "たった今";
+    if(diffSec < 60) return diffSec + "秒前";
+    const diffMin = Math.round(diffSec/60);
+    if(diffMin < 60) return diffMin + "分前";
+    const diffHour = Math.round(diffMin/60);
+    if(diffHour < 24) return diffHour + "時間前";
+    return Math.round(diffHour/24) + "日前";
+  }
+
+  function updateLastSyncNote(){
+    const el = document.getElementById("lastSyncNote");
+    if(el) el.textContent = "最終同期: " + formatRelativeTime(state.lastCloudSyncAt);
+  }
+
   function renderAccount(){
     const enabled = window.CandyFirebase && window.CandyFirebase.enabled();
     document.getElementById("accountDisabledNotice").style.display = enabled ? "none" : "block";
@@ -1223,6 +1261,7 @@
       document.getElementById("syncCodeValue").textContent = state.syncCode || "----‑----";
       document.getElementById("connectionStatusText").textContent = "未確認（下のボタンで確認できます）";
       document.getElementById("connectionStatusText").style.color = "#8A6B99";
+      updateLastSyncNote();
     }
   }
 
@@ -1508,6 +1547,31 @@
   }
 
   function startLevel(level){
+    // Boss/super-boss generation can take up to ~1-2s of synchronous work, which
+    // would otherwise freeze the screen with no feedback. For those, show a loading
+    // spinner first and defer the heavy work one tick so the browser gets a chance
+    // to actually paint the spinner before the freeze happens.
+    if(isBossLevel(level)){
+      showLoadingOverlay(isSuperBossLevel(level));
+      setTimeout(()=>{
+        startLevelImmediate(level);
+        hideLoadingOverlay();
+      }, 30);
+    } else {
+      startLevelImmediate(level);
+    }
+  }
+
+  function showLoadingOverlay(isSuper){
+    const el = document.getElementById("loadingOverlay");
+    document.getElementById("loadingOverlayText").textContent = isSuper ? "スーパーボスレベルを準備中..." : "ボスレベルを準備中...";
+    el.classList.add("show");
+  }
+  function hideLoadingOverlay(){
+    document.getElementById("loadingOverlay").classList.remove("show");
+  }
+
+  function startLevelImmediate(level){
     const gen = generateLevel(level);
     state.level = level; state.jars = gen.jars; state.numColors = gen.numColors;
     state.selected = null; state.moves = 0; state.history = [];
@@ -1684,6 +1748,8 @@
     const boss = isBossLevel(state.level);
     const superBoss = isSuperBossLevel(state.level);
     if(boss) reward = Math.round(reward * 1.5);
+    const isReplay = state.level < state.unlockedLevel;
+    if(isReplay) reward = Math.round(reward * 0.3); // replaying an already-cleared level pays much less, to prevent farming easy levels for gold
     addGold(reward);
     updateMissionProgress("clear", 1, true);
     if(stars===3) updateMissionProgress("star3", 1, true);
@@ -1711,7 +1777,7 @@
       gold_reward: reward,
       is_boss: boss,
       is_super_boss: superBoss,
-      is_replay: !improved,
+      is_replay: isReplay,
       used_items: state.toolUsedThisLevel
     });
 
@@ -1720,6 +1786,7 @@
     const bonusParts = [];
     if(boss) bonusParts.push("⚔️ ボスレベルボーナス ×1.5！");
     if(noItemBonus>0) bonusParts.push("ノーアイテムボーナス +"+noItemBonus+"G！");
+    if(isReplay) bonusParts.push("(リプレイのため報酬は控えめです)");
     document.getElementById("overlayBonus").textContent = bonusParts.join(" ");
     sfx.win(); updateHud();
     winOverlay.classList.add("show");
