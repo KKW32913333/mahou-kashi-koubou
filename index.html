@@ -121,6 +121,11 @@
 
   .ribbon{ background:var(--paper); border:2px dashed var(--glass-line); border-radius:14px; padding:8px 10px; font-size:11px; color:#7A6485; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
   .ribbon b{ color: var(--pink-deep); font-family: var(--font-num); }
+  .legal-links{
+    text-align:center; font-size:9.5px; color:#8A6B99; margin-top:8px; line-height:1.6;
+    text-shadow: 0 1px 0 rgba(255,255,255,.6);
+  }
+  .legal-links a{ color:#6B5473; text-decoration:underline; }
   .ribbon.claimed{ opacity:.5; cursor:default; }
 
   /* ---------------- GAME ---------------- */
@@ -366,6 +371,9 @@
         <div class="ribbon" id="loginRibbon">
           <span>🎁 ログインボーナス <b id="loginDayLabel">1日目</b></span>
           <span id="loginClaimLabel">受け取る ▸</span>
+        </div>
+        <div class="legal-links">
+          <a href="terms.html">利用規約</a>・<a href="privacy.html">プライバシーポリシー</a>・<a href="tokushoho.html">特定商取引法に基づく表記</a>
         </div>
       </div>
     </div>
