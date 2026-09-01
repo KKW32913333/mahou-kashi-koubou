@@ -452,6 +452,12 @@
 
       <div id="accountEnabledSection" style="display:none;">
         <div class="sync-code-card">
+          <div class="sync-code-label">接続状況</div>
+          <div id="connectionStatusText" style="font-size:12.5px; font-weight:700; color:#8A6B99; margin-bottom:10px;">未確認</div>
+          <button class="jar-btn missions" id="btnTestConnection" style="width:100%; font-size:13px; padding:11px 0; background:linear-gradient(180deg,#C6AEEA,var(--grape-deep));">🔍 接続テストを実行</button>
+        </div>
+
+        <div class="sync-code-card">
           <div class="sync-code-label">あなたの同期コード</div>
           <div class="sync-code-value" id="syncCodeValue">----‑----</div>
           <button class="jar-btn primary" id="btnCopySyncCode" style="width:100%; font-size:13px; padding:11px 0;">📋 コードをコピー</button>
@@ -1215,8 +1221,37 @@
     document.getElementById("accountEnabledSection").style.display = enabled ? "block" : "none";
     if(enabled){
       document.getElementById("syncCodeValue").textContent = state.syncCode || "----‑----";
+      document.getElementById("connectionStatusText").textContent = "未確認（下のボタンで確認できます）";
+      document.getElementById("connectionStatusText").style.color = "#8A6B99";
     }
   }
+
+  function describeFirebaseError(reason){
+    if(reason==="not-configured") return "firebase.js の設定がまだプレースホルダーのままか、SDKの読み込みに失敗しています。";
+    if(reason==="permission-denied") return "Firestoreのセキュリティルールで拒否されています。Firebaseコンソールでルールを確認してください（README.md参照）。";
+    if(reason==="unavailable") return "Firestoreに接続できません。ネットワーク状況を確認してください。";
+    if(reason==="not-found") return "指定したFirestoreプロジェクトが見つかりません。projectId の設定を確認してください。";
+    return "エラーが発生しました（" + reason + "）。ブラウザのコンソール（F12）に詳細ログが出力されています。";
+  }
+
+  document.getElementById("btnTestConnection").addEventListener("click", async ()=>{
+    const statusEl = document.getElementById("connectionStatusText");
+    statusEl.textContent = "確認中...";
+    statusEl.style.color = "#8A6B99";
+    if(!window.CandyFirebase || !window.CandyFirebase.enabled()){
+      statusEl.textContent = "❌ 未設定：" + describeFirebaseError("not-configured");
+      statusEl.style.color = "var(--pink-deep)";
+      return;
+    }
+    const result = await window.CandyFirebase.testConnection();
+    if(result.ok){
+      statusEl.textContent = "✅ 接続OK：クラウド機能は正常に動作しています";
+      statusEl.style.color = "var(--mint-deep)";
+    } else {
+      statusEl.textContent = "❌ 失敗：" + describeFirebaseError(result.reason);
+      statusEl.style.color = "var(--pink-deep)";
+    }
+  });
 
   document.getElementById("btnCopySyncCode").addEventListener("click", async ()=>{
     if(!state.syncCode) return;
@@ -1339,7 +1374,7 @@
     });
   }
 
-  function renderLocalRanking(){
+  function renderLocalRanking(note){
     const sample = [
       { name:"あんず", score: 42 }, { name:"みかん", score: 38 }, { name:"ラムネ", score: 35 },
       { name:"ぶどう", score: 29 }, { name:"はちみつ", score: 24 }, { name:"もも", score: 19 }
@@ -1347,22 +1382,30 @@
     const rows = sample.map(p => ({ name:p.name, score:p.score, me:false }));
     rows.push({ name: state.playerName + "(あなた)", score: state.bestLevel, me:true });
     rows.sort((a,b) => b.score - a.score);
-    renderRankRows(rows, "サンプル表示（Firebase未設定のためローカル表示）");
+    renderRankRows(rows, note || "サンプル表示（Firebase未設定のためローカル表示）");
   }
 
   function renderRanking(){
     document.getElementById("rankPlayerName").textContent = state.playerName;
-    if(window.CandyFirebase && window.CandyFirebase.enabled()){
+    const enabled = window.CandyFirebase && window.CandyFirebase.enabled();
+    if(enabled){
       const list = document.getElementById("rankList");
       list.innerHTML = '<div style="text-align:center;font-size:12px;color:#9B7CB0;padding:20px 0;">読み込み中...</div>';
       window.CandyFirebase.fetchTopScores(20).then(rows => {
-        if(!rows || rows.length===0){ renderLocalRanking(); return; }
+        if(rows===null){
+          renderLocalRanking("⚠️ 接続エラー：データを取得できませんでした（Firestoreのセキュリティルールをご確認ください）");
+          return;
+        }
+        if(rows.length===0){
+          renderLocalRanking("まだ誰もランキングに登録されていません（レベルクリアで自動登録されます）");
+          return;
+        }
         const mapped = rows.map(r => ({ name:r.name, score:r.score, me: r.id===state.playerId }));
         if(!mapped.some(r=>r.me)){
           mapped.push({ name: state.playerName + "(あなた)", score: state.bestLevel, me:true });
         }
         renderRankRows(mapped);
-      }).catch(()=>renderLocalRanking());
+      }).catch(()=>renderLocalRanking("⚠️ 接続エラー：データを取得できませんでした"));
     } else {
       renderLocalRanking();
     }

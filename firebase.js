@@ -23,13 +23,18 @@ const firebaseConfig = {
 
   try {
     const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
-    if (isConfigured && window.firebase) {
+    if (!isConfigured) {
+      console.log("[firebase.js] firebaseConfig is still the placeholder — using local fallback (this is expected until you edit firebase.js).");
+    } else if (!window.firebase) {
+      console.warn("[firebase.js] the Firebase SDK script tags did not load (network blocked / CDN unreachable?) — using local fallback.");
+    } else {
       firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
       enabled = true;
+      console.log("[firebase.js] Firebase initialized successfully. Use CandyFirebase.testConnection() in the console, or the 'クラウド同期コード' screen's connection test, to verify Firestore read/write actually works (a valid config can still fail if Firestore rules block access).");
     }
   } catch (e) {
-    console.warn("[firebase.js] initialization failed, falling back to local ranking:", e);
+    console.warn("[firebase.js] initialization threw an error, falling back to local ranking:", e);
     enabled = false;
   }
 
@@ -45,7 +50,7 @@ const firebaseConfig = {
       }, { merge: true });
       return true;
     } catch (e) {
-      console.warn("[firebase.js] submitScore failed:", e);
+      console.warn("[firebase.js] submitScore failed (" + (e.code || e.message) + "). If this says 'permission-denied', check your Firestore security rules.", e);
       return false;
     }
   }
@@ -60,7 +65,7 @@ const firebaseConfig = {
         .get();
       return snap.docs.map(d => ({ id: d.id, name: d.data().name, score: d.data().score }));
     } catch (e) {
-      console.warn("[firebase.js] fetchTopScores failed:", e);
+      console.warn("[firebase.js] fetchTopScores failed (" + (e.code || e.message) + "). If this says 'permission-denied', check your Firestore security rules.", e);
       return null;
     }
   }
@@ -81,7 +86,7 @@ const firebaseConfig = {
       });
       return true;
     } catch (e) {
-      console.warn("[firebase.js] saveCloudState failed:", e);
+      console.warn("[firebase.js] saveCloudState failed (" + (e.code || e.message) + "). If this says 'permission-denied', check your Firestore security rules for the cloudSaves collection.", e);
       return false;
     }
   }
@@ -93,8 +98,22 @@ const firebaseConfig = {
       if (!doc.exists) return null;
       return JSON.parse(doc.data().data);
     } catch (e) {
-      console.warn("[firebase.js] loadCloudState failed:", e);
+      console.warn("[firebase.js] loadCloudState failed (" + (e.code || e.message) + "). If this says 'permission-denied', check your Firestore security rules for the cloudSaves collection.", e);
       return null;
+    }
+  }
+
+  // 実際にFirestoreへ書き込み→読み込みを試し、設定が正しく機能しているかを
+  // その場で診断する。「設定したのに反映されない」原因切り分け用。
+  async function testConnection() {
+    if (!enabled) return { ok: false, reason: "not-configured" };
+    try {
+      const ref = db.collection("_connectionTest").doc("ping");
+      await ref.set({ t: Date.now() });
+      await ref.get();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: e.code || e.message || "unknown" };
     }
   }
 
@@ -103,6 +122,7 @@ const firebaseConfig = {
     submitScore,
     fetchTopScores,
     saveCloudState,
-    loadCloudState
+    loadCloudState,
+    testConnection
   };
 })();
