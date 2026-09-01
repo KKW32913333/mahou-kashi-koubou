@@ -50,6 +50,7 @@
 ```
 index.html
 firebase.js
+analytics.js
 manifest.json
 README.md
 ```
@@ -180,11 +181,40 @@ Firebaseを設定すると、ゴールドや進行状況が自動的にクラウ
 ```
 magic-candy-workshop/
 ├── index.html            # ゲーム本体（HTML・CSS・ゲームロジック）
-├── firebase.js            # オンラインランキング連携（設定は任意）
+├── firebase.js            # オンラインランキング・クラウドセーブ連携（設定は任意）
+├── analytics.js           # GA4アクセス解析連携（設定は任意）
 ├── manifest.json          # PWA設定（アプリ名・アイコン）
 ├── icon-58.png 〜 icon-1024.png  # アプリアイコン各サイズ
 └── README.md              # このファイル
 ```
+
+---
+
+## 📊 GA4（アクセス解析）設定（任意）
+
+離脱しやすいレベル、アイテム利用状況、ショップ購入などを分析したい場合は、Google Analytics 4 を設定できます。設定しなくてもゲームは通常通り動作します。
+
+1. [Google Analytics](https://analytics.google.com/) でプロパティを作成
+2. 「管理」→ 対象プロパティ →「データストリーム」→ 該当のウェブストリームを選択
+3. 表示された「測定ID」（`G-XXXXXXXXXX` の形式）をコピー
+4. `analytics.js` の `GA4_MEASUREMENT_ID` に貼り付け
+
+設定すると、以下のイベントが自動的に計測されます。
+
+| イベント名 | 内容 |
+|---|---|
+| `level_start` | レベル開始（レベル番号・ボス種別・容量など） |
+| `level_clear` | レベルクリア（手数・★評価・報酬など） |
+| `level_restart` | 「さいしょから」でのやり直し |
+| `item_used` | ヒント／シャッフル／ボトル追加の使用（所持品消費かゴールド購入かも記録） |
+| `shop_purchase` | ショップでの購入 |
+| `mission_complete` | デイリーミッション達成 |
+| `badge_earned` | バッジ獲得 |
+| `login_bonus_claim` | ログインボーナス受け取り |
+| `deadlock_recovery` | 詰み自動リカバリーの発動（生成品質の監視に有用） |
+| `tutorial_complete` | チュートリアル完了 |
+
+GA4の「探索」レポートなどで、レベルごとの離脱率やアイテム利用率を確認できます。
 
 ---
 
@@ -194,7 +224,8 @@ magic-candy-workshop/
 |---|---|
 | Vanilla JavaScript | ゲームロジック・パズル生成・UI制御（フレームワーク不使用） |
 | Web Audio API | 操作音・クリア音（音声ファイル不要） |
-| Firebase Firestore | オンラインランキングデータ保存 |
+| Firebase Firestore | オンラインランキング・クラウドセーブのデータ保存 |
+| Google Analytics 4 | 行動分析（離脱率・アイテム利用・購入傾向など） |
 | GitHub Pages | ゲームホスティング（無料） |
 | localStorage | ゴールド・進行状況・ミッション・盤面などの端末保存 |
 | PWA (Web App Manifest) | ホーム画面への追加・アプリアイコン表示 |

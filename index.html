@@ -14,6 +14,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="firebase.js"></script>
+<!-- Google Analytics 4 (see analytics.js to configure your own measurement ID) -->
+<script src="analytics.js"></script>
 <style>
   :root{
     --bg-1: #FFF2FA; --bg-2: #E9F7FF;
@@ -981,6 +983,11 @@
     return { jars, numColors };
   }
 
+  // ---------- analytics helper ----------
+  function track(eventName, params){
+    if(window.CandyAnalytics && window.CandyAnalytics.enabled()) window.CandyAnalytics.track(eventName, params);
+  }
+
   // ---------- gold helper (also drives "earn gold" mission) ----------
   function addGold(amount){
     state.gold += amount;
@@ -1010,6 +1017,7 @@
         badgeQueue.push(b.id);
         if(!state.equippedBadge) state.equippedBadge = b.id; // wear the first one automatically
         changed = true;
+        track("badge_earned", { badge_id: b.id, tier: b.tier });
       }
     });
     if(changed) saveGame();
@@ -1107,8 +1115,10 @@
     tutorialOverlay.classList.add("show");
   });
   document.getElementById("btnTutoClose").addEventListener("click", ()=>{
+    const firstTime = !state.tutorialSeen;
     state.tutorialSeen = true;
     tutorialOverlay.classList.remove("show");
+    if(firstTime) track("tutorial_complete", {});
     saveGame();
   });
   document.getElementById("btnGoShop").addEventListener("click", ()=>showView("shop"));
@@ -1129,6 +1139,7 @@
     state.loginClaimedToday = true;
     sfx.coin();
     showToast("ログインボーナス +" + reward + "G");
+    track("login_bonus_claim", { day: state.loginDay, reward: reward });
     renderTitle();
   });
 
@@ -1253,6 +1264,7 @@
           item.apply();
           sfx.coin();
           showToast(item.name + " を購入しました");
+          track("shop_purchase", { item_id: item.id, price: item.price });
           renderShop();
         });
       }
@@ -1288,6 +1300,7 @@
           addGold(m.reward);
           sfx.coin();
           showToast(m.name + " クリア！ +" + m.reward + "G");
+          track("mission_complete", { mission_id: m.id, reward: m.reward });
           renderMissions();
         });
       }
@@ -1450,6 +1463,14 @@
     state.toolUsedThisLevel = false;
     state.currentLevelHadRainbow = numRainbowForLevel(level) > 0;
     clearHintTimer();
+    track("level_start", {
+      level: level,
+      is_boss: isBossLevel(level),
+      is_super_boss: isSuperBossLevel(level),
+      capacity: CAPACITY,
+      num_colors: gen.numColors,
+      is_replay: level < state.unlockedLevel
+    });
 
     // Lock and freeze are temporary restrictions, not permanent blockers: a locked jar
     // always releases within LOCK_HARD_CAP_MOVES moves (sooner if another color is
@@ -1515,6 +1536,7 @@
     if(state.jars.length===0 || isSolved(state.jars)) return;
     if(hasAnyPlayableMove()) return;
     showToast("😵 手詰まりを検出したため、無料で盤面を立て直しました");
+    track("deadlock_recovery", { level: state.level, is_boss: isBossLevel(state.level), capacity: CAPACITY });
     startLevel(state.level);
   }
 
@@ -1631,6 +1653,16 @@
     }
     if(improved) submitScoreIfPossible();
     checkBadgeUnlocks();
+    track("level_clear", {
+      level: state.level,
+      moves: state.moves,
+      stars: stars,
+      gold_reward: reward,
+      is_boss: boss,
+      is_super_boss: superBoss,
+      is_replay: !improved,
+      used_items: state.toolUsedThisLevel
+    });
 
     document.getElementById("overlayStars").textContent = "★".repeat(stars) + "☆".repeat(3-stars);
     document.getElementById("rewardValue").textContent = "+" + reward;
@@ -1650,7 +1682,10 @@
     clearHintTimer();
     renderJars();
   });
-  document.getElementById("btnRestart").addEventListener("click", ()=>startLevel(state.level));
+  document.getElementById("btnRestart").addEventListener("click", ()=>{
+    track("level_restart", { level: state.level, moves_before_restart: state.moves });
+    startLevel(state.level);
+  });
 
   document.getElementById("btnHint").addEventListener("click", ()=>{
     const moves = allValidMoves(state.jars);
@@ -1663,9 +1698,11 @@
     });
     if(!best) best = moves[Math.floor(Math.random()*moves.length)];
 
+    const paidWithGold = state.inventory.hint<=0;
     if(state.inventory.hint>0) state.inventory.hint--; else state.gold-=50;
     updateMissionProgress("hint", 1, true);
     state.toolUsedThisLevel = true;
+    track("item_used", { item_type:"hint", level: state.level, paid_with_gold: paidWithGold });
 
     state.selected = best[0];
     clearHintTimer();
@@ -1676,9 +1713,11 @@
 
   document.getElementById("btnShuffle").addEventListener("click", ()=>{
     if(state.inventory.shuffle<=0 && state.gold<80){ showToast("ゴールドが足りません"); return; }
+    const paidWithGold = state.inventory.shuffle<=0;
     if(state.inventory.shuffle>0) state.inventory.shuffle--; else state.gold-=80;
     state.toolUsedThisLevel = true;
     updateMissionProgress("shuffle", 1, true);
+    track("item_used", { item_type:"shuffle", level: state.level, paid_with_gold: paidWithGold });
     const gen = generateLevel(state.level);
     const extra = state.jars.length - gen.jars.length;
     state.jars = gen.jars;
@@ -1690,9 +1729,11 @@
   document.getElementById("btnAddJar").addEventListener("click", ()=>{
     if(state.jars.length>=MAX_JARS){ showToast("これ以上ボトルを追加できません"); return; }
     if(state.inventory.bottle<=0 && state.gold<120){ showToast("ゴールドが足りません"); return; }
+    const paidWithGold = state.inventory.bottle<=0;
     if(state.inventory.bottle>0) state.inventory.bottle--; else state.gold-=120;
     state.toolUsedThisLevel = true;
     updateMissionProgress("addjar", 1, true);
+    track("item_used", { item_type:"addjar", level: state.level, paid_with_gold: paidWithGold });
     state.history.push({ jars: cloneJars(state.jars), moves: state.moves });
     state.jars.push([]);
     renderJars(); showToast("ボトルを追加しました");
