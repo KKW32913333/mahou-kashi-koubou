@@ -116,8 +116,8 @@
     background: var(--paper); border: 2px dashed var(--glass-line); border-radius:999px; padding:8px 0; cursor:pointer;
     box-shadow: 0 3px 0 rgba(0,0,0,.08);
   }
-  .mini-link-row{ display:flex; gap:8px; }
-  .mini-link-row .level-select-link{ flex:1; font-size:11.5px; padding:8px 4px; }
+  .mini-link-row{ display:flex; gap:6px; }
+  .mini-link-row .level-select-link{ flex:1; font-size:11px; padding:8px 2px; }
 
   .ribbon{ background:var(--paper); border:2px dashed var(--glass-line); border-radius:14px; padding:8px 10px; font-size:11px; color:#7A6485; display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
   .ribbon b{ color: var(--pink-deep); font-family: var(--font-num); }
@@ -150,6 +150,18 @@
 
   .jar-grid.big-bottle-mode .jar{ aspect-ratio: 3/5.6; }
   .jar-grid.super-bottle-mode .jar{ aspect-ratio: 3/6.4; }
+  .candy-pop-icon{
+    position:absolute; left:50%; top:8%; transform:translateX(-50%);
+    font-size:26px; pointer-events:none; z-index:15;
+    animation: candyFloat .9s ease-out forwards;
+  }
+  @keyframes candyFloat{
+    0%{ opacity:0; transform:translate(-50%,10px) scale(.5); }
+    28%{ opacity:1; transform:translate(-50%,-14px) scale(1.25); }
+    100%{ opacity:0; transform:translate(-50%,-64px) scale(1); }
+  }
+  .jar-body.candy-glow{ box-shadow: 0 0 0 3px #FFD65C, 0 0 20px rgba(255,214,92,.85); animation: candyGlowPulse .5s ease-in-out 1; }
+  @keyframes candyGlowPulse{ 0%,100%{ transform: scale(1); } 40%{ transform: scale(1.08); } }
 
   .boss-banner{
     display:none; text-align:center; font-family:'Yomogi', cursive; font-size:14px; font-weight:700;
@@ -366,8 +378,9 @@
       <div class="menu-zone">
         <button class="jar-btn primary" id="btnStart">スタート (LEVEL <span id="titleLevel">1</span>)</button>
         <div class="mini-link-row">
-          <div class="level-select-link" id="btnGoLevels">🗂️ レベル選択 ▸</div>
-          <div class="level-select-link" id="btnGoAccount">☁️ 同期コード ▸</div>
+          <div class="level-select-link" id="btnGoLevels">🗂️ レベル</div>
+          <div class="level-select-link" id="btnGoCandydex">🍬 図鑑</div>
+          <div class="level-select-link" id="btnGoAccount">☁️ 同期</div>
         </div>
         <div class="menu-icons">
           <button class="jar-btn shop" id="btnGoShop">🛒 ショップ</button>
@@ -441,6 +454,18 @@
       <div class="view-head"><h2>バッジコレクション</h2></div>
       <div class="badge-hint" id="badgeHint">タップして装着するバッジを選べます</div>
       <div class="badge-grid" id="badgeGrid"></div>
+    </div>
+
+    <!-- ============ CANDY DEX ============ -->
+    <div class="view" id="view-candydex">
+      <div class="top-hud">
+        <div class="icon-btn" data-back>←</div>
+        <div class="gold-badge"><div class="gold-coin"></div><span id="candydexGold">300</span></div>
+        <div style="width:34px"></div>
+      </div>
+      <div class="view-head"><h2>お菓子図鑑</h2></div>
+      <div class="badge-hint" id="candydexHint">ジャーを完成させると魔法菓子ができます</div>
+      <div class="badge-grid" id="candydexGrid"></div>
     </div>
 
     <!-- ============ ACCOUNT / CLOUD SYNC ============ -->
@@ -542,6 +567,7 @@
         <div class="tuto-step"><div class="emoji">❄️</div><div class="txt">レベル8以降は<b>凍ったジャー</b>も登場。あと数手プレイすると自然に溶けます</div></div>
         <div class="tuto-step"><div class="emoji">⚔️</div><div class="txt">5の倍数レベルは<b>ボスレベル</b>。大瓶(容量5)で手強くなる代わりに報酬も1.5倍！</div></div>
         <div class="tuto-step"><div class="emoji">🏅</div><div class="txt">節目のレベルや実績を達成すると<b>バッジ</b>がもらえます。タイトル画面上部で装着して見せびらかそう！</div></div>
+        <div class="tuto-step"><div class="emoji">🍬</div><div class="txt">ジャーを完成させると<b>魔法菓子</b>に変身！色ごとに違うお菓子ができ、「お菓子図鑑」に集められます</div></div>
         <button class="jar-btn primary" id="btnTutoClose" style="width:100%;">はじめる！</button>
       </div>
     </div>
@@ -578,6 +604,21 @@
   const RAINBOW_ID = -1; // wildcard "color" — matches any color when pouring
 
   // Collectible badges — earned via milestones, displayed on the title screen when equipped.
+  // 完成したジャーが変身する「魔法菓子」の定義。色ごとに専用の菓子があり、
+  // 虹色ジェリーが混ざったジャーは特別な菓子になる。
+  const CANDY_DEFS = {
+    "0": { name:"いちごキャンディ", icon:"🍓" },
+    "1": { name:"ミントキャンディ", icon:"🍬" },
+    "2": { name:"レモンキャンディ", icon:"🍋" },
+    "3": { name:"ぶどうキャンディ", icon:"🍇" },
+    "4": { name:"オレンジキャンディ", icon:"🍊" },
+    "5": { name:"ソーダキャンディ", icon:"🥤" },
+    "6": { name:"ローズキャンディ", icon:"🌹" },
+    "7": { name:"メロンキャンディ", icon:"🍈" },
+    "rainbow": { name:"虹色ロリポップ", icon:"🍭" }
+  };
+  const CANDY_TYPE_COUNT = Object.keys(CANDY_DEFS).length;
+
   const BADGE_DEFS = [
     { id:"level10",         name:"見習い菓子職人",     desc:"レベル10をクリア",              icon:"🍬", tier:"bronze",  check:s=>s.bestLevel>=10 },
     { id:"level20",         name:"一人前の魔法職人",   desc:"レベル20をクリア",              icon:"🏆", tier:"silver",  check:s=>s.bestLevel>=20 },
@@ -589,7 +630,8 @@
     { id:"noItemMaster",    name:"無双の腕前",         desc:"ノーアイテムクリアを5回達成",   icon:"✨", tier:"silver",  check:s=>s.lifetimeStats.totalNoItem>=5 },
     { id:"goldCollector",   name:"ゴールドコレクター", desc:"累計3,000ゴールドを稼ぐ",       icon:"💰", tier:"bronze",  check:s=>s.lifetimeStats.totalGoldEarned>=3000 },
     { id:"loyalPlayer",     name:"常連さん",           desc:"7日間プレイする",               icon:"📅", tier:"bronze",  check:s=>s.loginDay>=7 },
-    { id:"rainbowUser",     name:"虹の魔法使い",       desc:"虹色ジェリーのあるレベルをクリア", icon:"🌈", tier:"gold",  check:s=>s.lifetimeStats.rainbowClears>=1 }
+    { id:"rainbowUser",     name:"虹の魔法使い",       desc:"虹色ジェリーのあるレベルをクリア", icon:"🌈", tier:"gold",  check:s=>s.lifetimeStats.rainbowClears>=1 },
+    { id:"candyCollector",  name:"お菓子コレクター",   desc:"すべての魔法菓子を1つ以上作る",     icon:"🍭", tier:"rainbow", check:s=>Object.keys(s.candyCollection||{}).filter(k=>s.candyCollection[k]>0).length>=CANDY_TYPE_COUNT }
   ];
 
   // Pool of possible daily missions — 3 are drawn at random each day for variety.
@@ -637,7 +679,9 @@
     equippedBadge: null,
     currentLevelHadRainbow: false,
     syncCode: null,
-    lastCloudSyncAt: null
+    lastCloudSyncAt: null,
+    candyCollection: {},
+    celebratedJars: new Set()
   };
 
   const SHOP_ITEMS = [
@@ -677,7 +721,8 @@
       frozenMeltAtMoves: state.frozenMeltAtMoves,
       capacity: CAPACITY,
       syncCode: state.syncCode,
-      lastCloudSyncAt: state.lastCloudSyncAt
+      lastCloudSyncAt: state.lastCloudSyncAt,
+      candyCollection: state.candyCollection
     };
   }
 
@@ -716,6 +761,7 @@
       state.selected = null;
       state.history = [];
       if(typeof data.capacity === "number") CAPACITY = data.capacity;
+      if(!state.candyCollection || typeof state.candyCollection !== "object") state.candyCollection = {};
       return true;
     }catch(e){
       return false;
@@ -1079,6 +1125,7 @@
     game: document.getElementById("view-game"),
     levels: document.getElementById("view-levels"),
     badges: document.getElementById("view-badges"),
+    candydex: document.getElementById("view-candydex"),
     account: document.getElementById("view-account"),
     shop: document.getElementById("view-shop"),
     missions: document.getElementById("view-missions"),
@@ -1095,6 +1142,7 @@
     if(name==="title") renderTitle();
     if(name==="levels") renderLevelSelect();
     if(name==="badges") renderBadges();
+    if(name==="candydex") renderCandydex();
     if(name==="account") renderAccount();
     if(name==="shop") renderShop();
     if(name==="missions") renderMissions();
@@ -1109,7 +1157,7 @@
   }
 
   function syncGoldDisplays(){
-    ["titleGold","goldValue","shopGold","missionsGold","levelsGold","badgesGold"].forEach(id=>{
+    ["titleGold","goldValue","shopGold","missionsGold","levelsGold","badgesGold","candydexGold"].forEach(id=>{
       const el=document.getElementById(id);
       if(el) el.textContent = state.gold.toLocaleString();
     });
@@ -1161,6 +1209,7 @@
   document.getElementById("btnGoMissions").addEventListener("click", ()=>showView("missions"));
   document.getElementById("btnGoLevels").addEventListener("click", ()=>showView("levels"));
   document.getElementById("btnOpenBadges").addEventListener("click", ()=>showView("badges"));
+  document.getElementById("btnGoCandydex").addEventListener("click", ()=>showView("candydex"));
   document.getElementById("btnGoAccount").addEventListener("click", ()=>showView("account"));
   document.getElementById("btnMuteTitle").addEventListener("click", ()=>{
     state.muted=!state.muted;
@@ -1234,6 +1283,26 @@
     badgeOverlayShowing = false;
     setTimeout(processBadgeQueue, 300);
   });
+
+  // ---------- CANDY DEX ----------
+  function renderCandydex(){
+    syncGoldDisplays();
+    const grid = document.getElementById("candydexGrid");
+    grid.innerHTML = "";
+    Object.keys(CANDY_DEFS).forEach(type=>{
+      const def = CANDY_DEFS[type];
+      const count = state.candyCollection[type] || 0;
+      const earned = count > 0;
+      const card = document.createElement("div");
+      card.className = "badge-card" + (earned ? " earned tier-gold" : " locked");
+      card.innerHTML = `
+        <div class="badge-icon-wrap">${earned ? def.icon : "🔒"}</div>
+        <div class="badge-name">${earned ? def.name : "？？？"}</div>
+        <div class="badge-desc">${earned ? ("作った数: " + count) : "ジャーを完成させて発見しよう"}</div>
+      `;
+      grid.appendChild(card);
+    });
+  }
 
   // ---------- ACCOUNT / CLOUD SYNC ----------
   function formatRelativeTime(ts){
@@ -1571,12 +1640,19 @@
     document.getElementById("loadingOverlay").classList.remove("show");
   }
 
+  function computeCelebratedJars(jars){
+    const s = new Set();
+    jars.forEach((j,i)=>{ if(j.length===CAPACITY && isJarSolved(j)) s.add(i); });
+    return s;
+  }
+
   function startLevelImmediate(level){
     const gen = generateLevel(level);
     state.level = level; state.jars = gen.jars; state.numColors = gen.numColors;
     state.selected = null; state.moves = 0; state.history = [];
     state.toolUsedThisLevel = false;
     state.currentLevelHadRainbow = numRainbowForLevel(level) > 0;
+    state.celebratedJars = computeCelebratedJars(state.jars);
     clearHintTimer();
     track("level_start", {
       level: level,
@@ -1647,6 +1723,38 @@
   function hasAnyPlayableMove(){
     return allValidMoves(state.jars).some(([i,j]) => !isLocked(i) && !isLocked(j) && !isFrozen(i) && !isFrozen(j));
   }
+  function candyTypeForJar(jar){
+    return jar.some(c => c===RAINBOW_ID) ? "rainbow" : String(jar[0]);
+  }
+
+  function celebrateCandy(jarIdx){
+    const jar = state.jars[jarIdx];
+    const type = candyTypeForJar(jar);
+    const def = CANDY_DEFS[type];
+    const firstTime = !state.candyCollection[type];
+    state.candyCollection[type] = (state.candyCollection[type] || 0) + 1;
+
+    const jarEls = jarGrid.querySelectorAll(".jar");
+    const jarEl = jarEls[jarIdx];
+    if(jarEl){
+      const pop = document.createElement("div");
+      pop.className = "candy-pop-icon";
+      pop.textContent = def.icon;
+      jarEl.appendChild(pop);
+      setTimeout(()=>pop.remove(), 900);
+      const body = jarEl.querySelector(".jar-body");
+      if(body){
+        body.classList.add("candy-glow");
+        setTimeout(()=>body.classList.remove("candy-glow"), 900);
+      }
+    }
+    sfx.coin();
+    showToast((firstTime ? "🎉 新しい魔法菓子！ " : "") + def.icon + " " + def.name + "ができました！");
+    track("candy_made", { type: type, first_time: firstTime });
+    if(firstTime) checkBadgeUnlocks();
+    saveGame();
+  }
+
   function checkAndRecoverFromDeadlock(){
     if(state.jars.length===0 || isSolved(state.jars)) return;
     if(hasAnyPlayableMove()) return;
@@ -1723,6 +1831,10 @@
       updateMissionProgress("moves", 1, true);
       const poured = idx; state.selected = null;
       renderJars(poured);
+      if(!state.celebratedJars.has(poured) && state.jars[poured].length===CAPACITY && isJarSolved(state.jars[poured])){
+        state.celebratedJars.add(poured);
+        celebrateCandy(poured);
+      }
       if(isSolved(state.jars)){
         setTimeout(onLevelClear, 260);
       } else {
@@ -1871,6 +1983,7 @@
     // resume exactly where the player left off, including a mid-level board
     state.selected = null;
     state.lockedJars = state.lockedJars instanceof Set ? state.lockedJars : new Set(state.lockedJars || []);
+    state.celebratedJars = computeCelebratedJars(state.jars);
     winOverlay.classList.remove("show");
     updateBossBannerAndJarSizing(state.level);
     renderJars();
