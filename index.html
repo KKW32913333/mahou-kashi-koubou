@@ -162,6 +162,13 @@
   }
   .jar-body.candy-glow{ box-shadow: 0 0 0 3px #FFD65C, 0 0 20px rgba(255,214,92,.85); animation: candyGlowPulse .5s ease-in-out 1; }
   @keyframes candyGlowPulse{ 0%,100%{ transform: scale(1); } 40%{ transform: scale(1.08); } }
+  .candy-icon-display{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:30px; z-index:8; text-shadow: 0 2px 5px rgba(0,0,0,.35), 0 0 10px rgba(255,255,255,.5);
+    animation: candyIdleBounce 2.6s ease-in-out infinite;
+  }
+  @keyframes candyIdleBounce{ 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-3px);} }
+  .jar-body.candy-filled .seg{ filter: saturate(.7) brightness(1.08); }
 
   .boss-banner{
     display:none; text-align:center; font-family:'Yomogi', cursive; font-size:14px; font-weight:700;
@@ -1572,8 +1579,9 @@
       jarEl.className = "jar";
       const lid = document.createElement("div"); lid.className="jar-lid";
       const body = document.createElement("div"); body.className="jar-body";
+      const solved = jar.length===CAPACITY && isJarSolved(jar);
       if(state.selected===idx) body.classList.add("selected");
-      if(jar.length===CAPACITY && isJarSolved(jar)) body.classList.add("solved");
+      if(solved) body.classList.add("solved");
       if(justPouredInto===idx) body.classList.add("pop");
       const locked = isLocked(idx);
       const frozen = isFrozen(idx);
@@ -1609,6 +1617,15 @@
         body.appendChild(seg);
       });
       jarEl.appendChild(lid); jarEl.appendChild(body);
+      if(solved){
+        const type = candyTypeForJar(jar);
+        const def = CANDY_DEFS[type];
+        const candyDisplay = document.createElement("div");
+        candyDisplay.className = "candy-icon-display";
+        candyDisplay.textContent = def.icon;
+        body.appendChild(candyDisplay);
+        body.classList.add("candy-filled");
+      }
       jarEl.addEventListener("click", ()=>onJarClick(idx));
       jarGrid.appendChild(jarEl);
     });
